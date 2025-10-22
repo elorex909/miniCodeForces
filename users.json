@@ -1,0 +1,55 @@
+{
+  "ahmed123": {
+    "pw_hash": "scrypt:32768:8:1$DJJwLw9YNuXgP84C$5bbc5e6344f8c5b69a81a30a2e82c6955d4acbe5660c8c3630c62c824fdae2694361cd4b5d029d38eb6d71eb5fedb49633b50377de4792975a6fc90530dc08ff",
+    "level": "E",
+    "submissions": {
+      "2": {
+        "best_status": "Compile Error",
+        "attempts": 1
+      },
+      "3": {
+        "best_status": "Compile Error",
+        "attempts": 4
+      },
+      "1": {
+        "best_status": "Wrong Answer",
+        "attempts": 1,
+        "ai_flagged": false,
+        "ai_reason": ""
+      }
+    },
+    "badges": [
+      "First Timer"
+    ]
+  },
+  "ameen": {
+    "pw_hash": "scrypt:32768:8:1$i5ivbgWqbuK8Zcx0$1e57a1a72a20faf6f1abdf18356de03fd3e15e0002cf9443c644c33db87f106b463710d9da7b254ae3e067e52e9bf184a5c3a2a517f62ba0dc55f57db2ffa6b3",
+    "level": "D",
+    "submissions": {
+      "1": {
+        "best_status": "Wrong Answer",
+        "attempts": 1
+      }
+    },
+    "badges": [
+      "First Timer"
+    ]
+  },
+  "joseph": {
+    "pw_hash": "scrypt:32768:8:1$e7rtIuxuI8TvDz5H$6163d1ed1be853d8d0861961cd0a4f7920c16ffcf6f34f7a990511dfaea11d0c78f111d33dd9b89743cc06d1e1eeaeb178b56b0660eb2215aa17ffa3af448ca6",
+    "level": "E",
+    "submissions": {
+      "1": {
+        "best_status": "Accepted",
+        "attempts": 5,
+        "ai_flagged": false,
+        "ai_reason": "No immediate AI flag."
+      }
+    },
+    "badges": [
+      "First Timer",
+      "Problem Solved",
+      "First Blood"
+    ]
+  }
+}
