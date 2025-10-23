@@ -419,6 +419,7 @@ def render_base(content, **kwargs):
     {{ content|safe }}
 
     <p class="notice">⚠️ Warning: This project is for local use only. Running user code on a public server **without sandboxing** is highly insecure.</p>
+    <p class="small" style="text-align: center;">Made by Ahmed Hassan</p>
   </div>
 </body>
 </html>
@@ -641,9 +642,9 @@ Hello###Hello</textarea>
           <td class="level-{udata["level"]}">{udata["level"]}</td>
           <td>{udata["total_solved"]}</td>
           {''.join(f"""
-            <td class="status-{udata['submissions'].get(str(q['id']), {}).get('best_status', 'Not Attempted').split(' ')[0] if udata['submissions'].get(str(q['id']), {}).get('best_status') != 'Not Attempted' else 'NA'}">
+            <td class="status-{udata['submissions'].get(str(q['id']), {}).get('best_status', 'Not Attempted').split(' ')[0] if udata['submissions'].get(str(q['id']), {}).get('best_status') not in ['Not Attempted', 'Cheated'] else udata['submissions'].get(str(q['id']), {}).get('best_status', 'Not Attempted').split(' ')[0]}">
               {udata['submissions'].get(str(q['id']), {}).get('best_status', 'Not Attempted').split(' ')[0] if udata['submissions'].get(str(q['id']), {}).get('best_status') != 'Not Attempted' else '-'}
-              {/* NEW: Display CHEATED flag */}
+              
               {f'<span title="{udata["submissions"].get(str(q["id"]), {}).get("ai_reason", "AI Flagged")}" class="ai-flag-admin">🚨 CHEATED</span>' if udata['submissions'].get(str(q['id']), {}).get('best_status') == 'Cheated' else ''}
             </td>
           """ for q in qs)}
@@ -1447,7 +1448,6 @@ int main() {
         lineNumbers: true,
         mode: "text/x-c++src",
         autoCloseBrackets: true,
-        indentUnit: 4,
         theme: "monokai", 
         readOnly: {{{{ 'true' if not is_submission_allowed else 'false' }}}}
       }});
