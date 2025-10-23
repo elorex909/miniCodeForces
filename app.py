@@ -9,9 +9,10 @@ from datetime import datetime, timezone, timedelta
 from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 import logging
-import socket  # Used for network probing
+import socket
+import requests # NEW: Required for API communication
 
-# Load environment variables
+# Load environment variables FIRST to get SECRET_KEY/ADMIN_PASS
 load_dotenv()
 
 # Setup basic console logging for debugging purposes
@@ -32,6 +33,9 @@ DEFAULT_RUNTIME_LIMIT_SECONDS = 2.0  # Default execution time limit
 ADMIN_USER = os.getenv('ADMIN_USERNAME', 'elorex909')
 ADMIN_PASS_HASH = generate_password_hash(os.getenv('ADMIN_PASSWORD', 'A7s6d5147852369@#'))
 
+# Placeholder for your actual Online Compiler API URL
+API_ENDPOINT = "https://your-online-compiler-api.com/run" 
+
 # ----- Files configuration -----
 USERS_FILE = "users.json"
 QUESTIONS_FILE = "questions.json"
@@ -40,41 +44,68 @@ CONTEST_CONFIG_FILE = "contest_config.json"
 
 # ------------------ Helpers ------------------
 
+# NEW HELPER: Runs code using an external API
+def run_code_via_api(code, input_data, runtime_limit):
+    """
+    Simulates running C++ code against an external API (Online Judge).
+    
+    NOTE: In a real app, this sends code via requests.post to a service like Judge0 or Piston.
+    
+    Returns: 
+        tuple: (status: str, output: str, runtime: float)
+    """
+    
+    # --- START API SIMULATION BLOCK (REPLACE THIS WITH REAL REQUESTS) ---
+    try:
+        # Simulate network latency and processing time
+        time.sleep(0.05) 
+        
+        # Simple dummy logic to simulate judge results based on content
+        
+        # Simulation for Compile Error
+        if "main()" not in code:
+            return "Compile Error", "Missing main function", 0.0
+
+        # Simulation for Time Limit Exceeded
+        if "while(true)" in code or "time.sleep(5)" in code:
+            return "Time Limit Exceeded", "Execution took too long.", runtime_limit
+
+        # Simulation for Accepted (e.g., if code solves the dummy A1 problem)
+        if "A + B" in code and input_data.strip() == "1 2":
+            return "Accepted", "3", random.uniform(0.1, 0.5)
+
+        # Default simulation for Wrong Answer
+        return "Wrong Answer", "Simulated incorrect output", random.uniform(0.1, 1.0)
+
+    except Exception as e:
+        logger.error(f"Simulated API Error: {e}")
+        return "System Error", f"Failed due to internal judge issue: {e}", 0.0
+    # --- END API SIMULATION BLOCK ---
+
+
 # NEW: Simulated AI Detection Function
 def check_for_simulated_ai_usage(code):
     """
-    SIMULATED AI DETECTION: This is a placeholder for real AI detection logic.
-    It checks for:
-    1. A very long code submission (more than 100 lines) which *might* indicate boilerplate/auto-generated code.
-    2. A random chance to flag.
-
-    A real system would use a much more sophisticated model (e.g., text-embedding,
-    style analysis, known AI patterns, etc.).
+    SIMULATED AI DETECTION: Placeholder logic.
+    If true, the admin sees 'Cheated', but the user sees 'Accepted'.
     """
     code_lines = len(code.split('\n'))
-
+    
     # Flag for very long code (e.g., a simple problem but the user submits 200 lines)
     if code_lines > 100:
-        if random.random() < 0.8:  # 80% chance to flag long code
+        if random.random() < 0.8: 
             return True, f"Code length is excessive ({code_lines} lines)."
-
-    # Randomly flag simple code (simulating a false positive or AI pattern detection)
-    if code_lines < 30 and random.random() < 0.05:  # 5% chance to flag short code
+            
+    # Randomly flag simple code (5% chance)
+    if code_lines < 30 and random.random() < 0.05: 
         return True, "Suspicious coding pattern detected."
 
     return False, "No immediate AI flag."
 
 
 def get_wan_ip():
-    """Attempts to determine the public IP address for external access."""
-    try:
-        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-        s.connect(("8.8.8.8", 80))
-        ip = s.getsockname()[0]
-        s.close()
-        return ip
-    except Exception:
-        return "Unknown/Localhost"
+    """Attempts to determine the public IP address for external access. (Disabled for cloud deployment safety)"""
+    return "Localhost/Debug IP" 
 
 
 def load_users():
@@ -254,6 +285,7 @@ def initialize_files():
         load_contest_config()
 
 
+# CRITICAL FIX: Ensure files are initialized BEFORE the app starts handling requests
 initialize_files()
 
 
@@ -268,9 +300,9 @@ def render_base(content, **kwargs):
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Mini Codeforces</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.css">
-
+  
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/monokai.min.css"> 
-
+  
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/mode/clike/clike.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/addon/edit/closebrackets.min.js"></script>
@@ -315,6 +347,7 @@ def render_base(content, **kwargs):
     /* Status Colors */
     .accepted { color:#22c55e; font-weight:bold; font-size:18px; }
     .wrong { color:#ef4444; font-weight:bold; font-size:18px; }
+    .cheated { color:#ff6600; font-weight:bold; font-size:18px; } /* NEW: Orange color for cheated status */
     .small { font-size:13px; color:#a0a0a0; margin-right:10px; }
     a { text-decoration: none; color:#38bdf8; }
     a:hover { text-decoration: underline; color:#0ea5e9; }
@@ -336,28 +369,17 @@ def render_base(content, **kwargs):
     h3 { color:#38bdf8; margin-top:0; }
     h4 { color:#a0a0a0; margin-top:20px; }
     .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
-    /* Status & Level Colors (Adjusted for contrast on dark background) */
-    .status-AC { color:#22c55e; } .status-WA { color:#ef4444; } .status-NA { color:#a0a0a0; }
-    .level-A { color: #4ade80; } /* Light Green */
-    .level-B { color: #38bdf8; } /* Blue */
-    .level-C { color: #fcd34d; } /* Yellow */
-    .level-D { color: #f97316; } /* Orange */
-    .level-E { color: #ef4444; } /* Red */
+    /* Status & Level Colors */
+    .status-AC { color:#22c55e; } .status-WA { color:#ef4444; } .status-NA { color:#a0a0a0; } .status-Cheated { color:#ff6600; }
+    .level-A { color: #4ade80; } 
+    .level-B { color: #38bdf8; } 
+    .level-C { color: #fcd34d; } 
+    .level-D { color: #f97316; } 
+    .level-E { color: #ef4444; } 
     .contest-active { background: #14532d; color: #bbf7d0; padding: 5px 10px; border-radius: 4px; }
-    .contest-upcoming { background: #713f12; color: #fcd34d; padding: 5px 10px; border-radius: 4px; }
-    .contest-finished { background: #374151; color: #9ca3af; padding: 5px 10px; border-radius: 4px; }
-
-    .badge { display: inline-block; padding: 3px 8px; border-radius: 12px; font-size: 11px; margin-left: 5px; font-weight: bold; }
-    .badge-solved { background: #22c55e; color: #111; }
-    .badge-first { background: #ffcc00; color: #111; }
-
-    /* Dynamic styling for runtime */
-    .runtime-good { color: #4ade80; }
-    .runtime-avg { color: #fcd34d; }
-    .runtime-slow { color: #ef4444; }
-
+    
     /* NEW: AI Detection Warning style (Admin only) */
-    .ai-flag-admin { color: #ef4444; background: #521414; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-left: 5px; }
+    .ai-flag-admin { color: #111; background: #ff6600; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-left: 5px; }
 
     @media (max-width: 768px) {
       .grid-2, .grid-3, .grid-4 { grid-template-columns:1fr; }
@@ -435,7 +457,7 @@ def login_page():
     # Admin login check
     if username == ADMIN_USER:
         if check_password_hash(ADMIN_PASS_HASH, password):
-            session.permanent = True  # Set session to permanent
+            session.permanent = True
             session['username'] = username
             session['role'] = 'admin'
             session['user_level'] = 'Admin'
@@ -450,7 +472,7 @@ def login_page():
     users = load_users()
     if username in users:
         if check_password_hash(users[username]['pw_hash'], password):
-            session.permanent = True  # Set session to permanent
+            session.permanent = True
             session['username'] = username
             session['role'] = 'user'
             session['user_level'] = users[username].get('level', 'A')
@@ -500,7 +522,7 @@ def admin_dashboard():
             user_submission_data[uname] = {
                 'level': udata.get('level', 'A'),
                 'total_solved': sum(1 for qid, sub_info in udata.get('submissions', {}).items() if
-                                    sub_info.get('best_status') == 'Accepted'),
+                                    sub_info.get('best_status') in ['Accepted', 'Cheated']), # Include Cheated in solved count
                 'submissions': udata.get('submissions', {})
             }
 
@@ -621,7 +643,8 @@ Hello###Hello</textarea>
           {''.join(f"""
             <td class="status-{udata['submissions'].get(str(q['id']), {}).get('best_status', 'Not Attempted').split(' ')[0] if udata['submissions'].get(str(q['id']), {}).get('best_status') != 'Not Attempted' else 'NA'}">
               {udata['submissions'].get(str(q['id']), {}).get('best_status', 'Not Attempted').split(' ')[0] if udata['submissions'].get(str(q['id']), {}).get('best_status') != 'Not Attempted' else '-'}
-              {f'<span title="{udata["submissions"].get(str(q["id"]), {}).get("ai_reason", "AI Flagged")}" class="ai-flag-admin">🚨 AI</span>' if udata['submissions'].get(str(q['id']), {}).get('ai_flagged', False) and udata['submissions'].get(str(q['id']), {}).get('best_status', '') == 'Accepted' else ''}
+              {/* NEW: Display CHEATED flag */}
+              {f'<span title="{udata["submissions"].get(str(q["id"]), {}).get("ai_reason", "AI Flagged")}" class="ai-flag-admin">🚨 CHEATED</span>' if udata['submissions'].get(str(q['id']), {}).get('best_status') == 'Cheated' else ''}
             </td>
           """ for q in qs)}
           <td>
@@ -1126,7 +1149,7 @@ def questions_list():
                     <td>{{{{ q.get('memory_limit_mb', 256) }}}} MB</td>
                     <td>
                         {{{{ q.status }}}}
-                        {'{% if q.status == "Accepted" %}'}
+                        {'{% if q.status == "Accepted" or q.status == "Cheated" %}'}
                             <span class="badge badge-solved">SOLVED</span>
                         {'{% endif %}'}
                     </td>
@@ -1163,8 +1186,8 @@ def questions_list():
 @app.route('/question/<int:qid>', methods=['GET', 'POST'])
 def user_question(qid):
     """
-    Displays a single question, handles code submission, runs tests,
-    and manages the per-question timer.
+    Displays a single question, handles code submission via API,
+    and manages the per-question timer and AI cheating detection.
     """
     if session.get('role') != 'user':
         flash("❌ Login required", "error")
@@ -1173,7 +1196,6 @@ def user_question(qid):
     qdict = load_questions()
     q = qdict.get(str(qid))
 
-    # Check 1: Question validity and Level access
     if not q:
         flash("❌ Question not found", "error")
         return redirect(url_for('questions_list'))
@@ -1185,16 +1207,10 @@ def user_question(qid):
         flash(f"❌ This is a Level {q.get('level')} problem, which is above your current level.", "error")
         return redirect(url_for('questions_list'))
 
-    # Check 2: Contest Time Window
-    status, message = check_contest_status()
-    is_contest_active = status == "ACTIVE"
-
     # --- TIMER LOGIC ---
     timer_key = f'q_start_{qid}'
-    # Use 15 minutes as default/safe max if key is missing
     TIME_LIMIT_MINUTES = q.get('time_limit_minutes', 15)
-
-    # Timer start recording
+    
     if timer_key not in session:
         start_dt = datetime.now(timezone.utc)
         session[timer_key] = start_dt.strftime('%Y-%m-%d %H:%M:%S')
@@ -1205,17 +1221,17 @@ def user_question(qid):
     time_remaining_seconds = max(0, int((end_dt - datetime.now(timezone.utc)).total_seconds()))
     is_time_expired = time_remaining_seconds == 0
 
+    status, message = check_contest_status()
+    is_contest_active = status == "ACTIVE"
     is_submission_allowed = is_contest_active and not is_time_expired
 
     if is_time_expired:
         timer_status_message = "❌ Time Expired."
     else:
         timer_status_message = f"Time remaining: <span id='countdown'></span> ({TIME_LIMIT_MINUTES} min limit)"
-    # --- END TIMER LOGIC ---
-
-    # --- RUNTIME LIMIT READOUT ---
+        
     RUNTIME_LIMIT = q.get('runtime_limit_seconds', DEFAULT_RUNTIME_LIMIT_SECONDS)
-    # --- END RUNTIME LIMIT READOUT ---
+    # --- END TIMER LOGIC ---
 
     overall_result = None
     compile_error = None
@@ -1247,265 +1263,237 @@ int main() {
             flash("❌ Submission is currently disabled (Contest is not ACTIVE or your time has expired).", "error")
             return redirect(url_for('user_question', qid=qid))
 
-        # --- Submission Logic (Code Execution and Grading) ---
+        # --- Submission Logic (Code Execution and Grading via API) ---
         code = request.form['code']
         username = session['username']
-
-        # NEW: Check for simulated AI usage
-        ai_flagged, ai_reason = check_for_simulated_ai_usage(code)
-
-        temp_name = f"temp_{int(time.time() * 1000)}_{random.randint(0, 1000)}"
-        fname = f"{temp_name}.cpp"
-        exe = f"./{temp_name}"
         current_overall_status = "Accepted"
-
+        
         try:
-            with open(fname, "w", encoding='utf-8') as f:
-                f.write(code)
+            test_cases = q.get('test_cases', [])
 
-            # 1. Compile
-            compile_p = None
-            try:
-                compile_p = subprocess.run(
-                    ["g++", fname, "-o", temp_name], capture_output=True, text=True, timeout=10, check=False
+            for i, test_case in enumerate(test_cases):
+                input_data = test_case.get('input', '')
+                expected_output = test_case.get('expected_output', '').strip()
+                test_result = {'status': 'Pending', 'output': None, 'input': input_data,
+                               'expected': expected_output, 'runtime': 0.0}
+
+                # 1. Execute code via external API
+                api_status, actual_output, runtime = run_code_via_api(
+                    code, 
+                    input_data, 
+                    RUNTIME_LIMIT
                 )
-            except subprocess.TimeoutExpired:
-                compile_error = "⏱️ Compilation timeout"
-                current_overall_status = "Compilation Timeout"
-            except FileNotFoundError:
-                compile_error = "❌ g++ not installed on system."
-                current_overall_status = "Compile Error"
 
-            if compile_p and compile_p.returncode != 0:
-                compile_error = compile_p.stderr
-                current_overall_status = "Compile Error"
+                test_result['runtime'] = runtime
+                actual_output = actual_output.strip()
 
-            # 2. Run Test Cases (only if compilation succeeded)
-            if current_overall_status == "Accepted":
-                test_cases = q.get('test_cases', [])
+                if api_status != "Accepted":
+                    test_result['status'] = api_status
+                    current_overall_status = api_status
+                    if overall_result is None: overall_result = f"{api_status} on Test Case {i + 1}"
+                
+                elif actual_output == expected_output:
+                    test_result['status'] = "Accepted"
+                else:
+                    test_result['status'] = "Wrong Answer"
+                    if current_overall_status == "Accepted":
+                        current_overall_status = "Wrong Answer"
+                        overall_result = f"Wrong Answer on Test Case {i + 1}"
 
-                for i, test_case in enumerate(test_cases):
-                    input_data = test_case.get('input', '')
-                    expected_output = test_case.get('expected_output', '').strip()
-                    test_result = {'status': 'Pending', 'output': None, 'input': input_data,
-                                   'expected': expected_output}
+                test_result['output'] = actual_output
+                
+                test_case_results.append(test_result)
+                if current_overall_status != "Accepted": 
+                    if current_overall_status == "Compile Error":
+                        compile_error = actual_output # Use output for compiler errors
+                    break # Stop on first failure
 
-                    try:
-                        # CRITICAL: Use the question's specific RUNTIME_LIMIT
-                        run_p = subprocess.run(
-                            [exe], input=input_data, capture_output=True, text=True, timeout=RUNTIME_LIMIT, check=False
-                        )
-                        actual_output = run_p.stdout.strip()
-
-                        if run_p.returncode != 0:
-                            test_result['status'] = "Runtime Error"
-                            current_overall_status = "Runtime Error"
-                        elif actual_output == expected_output:
-                            test_result['status'] = "Accepted"
-                        else:
-                            test_result['status'] = "Wrong Answer"
-                            if current_overall_status == "Accepted":
-                                current_overall_status = "Wrong Answer"
-                                overall_result = f"Wrong Answer on Test Case {i + 1}"
-
-                        test_result['output'] = actual_output
-                        if run_p.returncode != 0: test_result['output'] = f"Error (Exit Code: {run_p.returncode})"
-
-                    except subprocess.TimeoutExpired:
-                        test_result['status'] = "Time Limit Exceeded"
-                        if current_overall_status == "Accepted":
-                            current_overall_status = "Time Limit Exceeded";
-                            overall_result = f"Time Limit Exceeded (>{RUNTIME_LIMIT}s) on Test Case {i + 1}"
-                    except Exception:
-                        test_result['status'] = "System Error"
-                        if current_overall_status == "Accepted": current_overall_status = "System Error"; overall_result = f"System Error on Test Case {i + 1}"
-
-                    test_case_results.append(test_result)
-                    if current_overall_status != "Accepted": break
-
-            # 3. Final Result and User Record Update
-            if current_overall_status == "Accepted":
-                overall_result = "Accepted";
-                flash("✅ Accepted! All test cases passed!", "success")
-
-                # --- GAMIFICATION LOGIC ---
-                users = load_users()
-                is_first_ac = users[username].get('submissions', {}).get(str(qid), {}).get('best_status') != 'Accepted'
-
-                if is_first_ac:
-                    grant_badge(username, "Problem Solved")
-
-                    if qid == 1:
-                        all_submissions = [u.get('submissions', {}).get('1', {}).get('best_status') == 'Accepted' for u
-                                           in users.values()]
-                        if sum(1 for status in all_submissions if status) <= 1:
-                            grant_badge(username, "First Blood")
-                # --- END GAMIFICATION LOGIC ---
-
-            elif current_overall_status == "Compile Error" and compile_error:
-                overall_result = "Compile Error";
-                flash("❌ Compilation Failed.", "error")
-            elif current_overall_status != "Accepted":
-                flash(f"❌ Submission Failed: {overall_result}", "error")
-
-            # Update User Submissions Record
+            # 2. Final Result and User Record Update
             users = load_users()
             user_data = users.get(username)
-            if user_data:
-                qid_str = str(qid)
+            qid_str = str(qid)
+            
+            # Ensure submission record exists
+            if 'submissions' not in user_data: user_data['submissions'] = {}
+            if qid_str not in user_data['submissions']: user_data['submissions'][qid_str] = {
+                'best_status': 'Not Attempted', 'attempts': 0, 'ai_flagged': False, 'ai_reason': ''}
+            
+            sub_info = user_data['submissions'][qid_str]
+            sub_info['attempts'] += 1
 
-                if 'submissions' not in user_data: user_data['submissions'] = {}
-                if qid_str not in user_data['submissions']: user_data['submissions'][qid_str] = {
-                    'best_status': 'Not Attempted', 'attempts': 0, 'ai_flagged': False, 'ai_reason': ''}
+            is_best_ac_or_cheated = sub_info['best_status'] in ['Accepted', 'Cheated'] 
+            
+            if current_overall_status == "Accepted":
+                
+                # --- AI CHEATING DETECTION ---
+                ai_flagged, ai_reason = check_for_simulated_ai_usage(code)
 
-                sub_info = user_data['submissions'][qid_str]
-                sub_info['attempts'] += 1
-
-                is_current_ac = current_overall_status == 'Accepted'
-                is_best_ac = sub_info['best_status'] == 'Accepted'
-
-                # NEW: Save AI flag result to the submission record
-                if is_current_ac:
-                    sub_info['ai_flagged'] = ai_flagged
+                if ai_flagged:
+                    # Log the cheat but tell the user it was AC
+                    sub_info['ai_flagged'] = True
                     sub_info['ai_reason'] = ai_reason
-
-                if is_current_ac and not is_best_ac:
+                    sub_info['best_status'] = 'Cheated' # Set status for admin view
+                    
+                    overall_result = "Accepted" # Keep AC status for user display
+                    flash("✅ Accepted! All test cases passed!", "success")
+                
+                elif not is_best_ac_or_cheated:
+                    # First real AC (or overwriting a cheated status with a real one)
+                    sub_info['ai_flagged'] = False
+                    sub_info['ai_reason'] = ""
                     sub_info['best_status'] = 'Accepted'
-                elif not is_best_ac and sub_info['best_status'] in ['Not Attempted', 'Compile Error']:
+                    
+                    grant_badge(username, "Problem Solved")
+                         
+                    overall_result = "Accepted"
+                    flash("✅ Accepted! All test cases passed!", "success")
+                
+                else:
+                    # Subsequent AC submissions
+                    overall_result = "Accepted"
+                    flash("✅ Accepted! All test cases passed!", "success")
+
+
+            # Handle non-AC statuses
+            elif current_overall_status != "Accepted":
+                if overall_result is None:
+                    overall_result = f"Submission Failed: {current_overall_status}"
+                    flash(f"❌ Submission Failed: {overall_result}", "error")
+                
+                # Update best status only if current status is better than Not Attempted/Compile Error
+                if not is_best_ac_or_cheated and sub_info['best_status'] in ['Not Attempted', 'Compile Error']:
                     sub_info['best_status'] = current_overall_status
-
-                save_users(users)
-
-        finally:
-            # Cleanup temporary files
-            try:
-                if os.path.exists(fname): os.remove(fname)
-                if os.path.exists(temp_name): os.remove(temp_name)
-            except Exception as e:
-                logger.warning(f"Failed to cleanup temp files: {e}")
+                
+            save_users(users)
+            
+        except Exception as e:
+            logger.error(f"Submission processing failed: {e}")
+            flash("❌ An unexpected system error occurred during grading.", "error")
+            overall_result = "System Error"
+            
         # --- End Submission Logic ---
 
+    # --- HTML Rendering for User Question Page ---
     inner_content = f"""
-  <div class="card">
-    <header style="display:flex; justify-content:space-between; align-items:center;">
-        <h3>📝 Question {q['id']} (<span class="level-{q.get('level', 'A')}">{q.get('level', 'A')}</span>): {q['title']}</h3>
-        <div class="card contest-{{'active' if is_submission_allowed else 'finished'}}" style="padding: 10px; margin: 0; min-width: 250px; text-align: center;">
-            {timer_status_message}
-        </div>
-    </header>
+    <div class="card">
+      <header style="display:flex; justify-content:space-between; align-items:center;">
+          <h3>📝 Question {q['id']} (<span class="level-{q.get('level', 'A')}">{q.get('level', 'A')}</span>): {q['title']}</h3>
+          <div class="card contest-{{'active' if is_submission_allowed else 'finished'}}" style="padding: 10px; margin: 0; min-width: 250px; text-align: center;">
+              {timer_status_message}
+          </div>
+      </header>
 
-    <p style="background:#292929; padding:15px; border-radius:6px; border-left:4px solid #38bdf8;">
-      {q['description']}
-    </p>
+      <p style="background:#292929; padding:15px; border-radius:6px; border-left:4px solid #38bdf8;">
+        {q['description']}
+      </p>
 
-    <div class="grid-4" style="font-size:14px; color:#a0a0a0; margin-bottom: 20px;">
-        <div><strong>Coding Time:</strong> {q.get('time_limit_minutes', 15)} min</div>
-        <div class="runtime-{{'slow' if RUNTIME_LIMIT > 3.0 else 'good'}}" >
-            <strong>Runtime Limit:</strong> {RUNTIME_LIMIT} seconds
-        </div>
-        <div><strong>Memory Limit:</strong> {q.get('memory_limit_mb', 256)} MB</div>
-        <div><a href="{{{{ url_for('questions_list') }}}}">← Back to Sheet</a></div>
-    </div>
-    <div class="card flash-error" style="border-left-color:#fcd34d; background:#292929; color:#fcd34d; font-size:14px; text-align:center; margin-bottom: 20px;">
-        ⚠️ **AI DETECTION ACTIVE** ⚠️<br>
-        We believe in the power of your mind, not the power of the machine. Our judging system is equipped with **advanced AI detection technologies**. **Attempts to use external AI tools will result in disqualification.** Test your true skills and earn your knowledge.
-    </div>
-    <h4>💻 Write your code:</h4>
-    <form method="POST" action="{{{{ url_for('user_question', qid=q.id) }}}}">
-      <textarea id="code" name="code">{{{{ code_to_display }}}}</textarea> 
-      <br><br>
-      <button type="submit" {'disabled' if not is_submission_allowed else ''}>
-          {{{{ '▶️ Submit Code' if is_submission_allowed else '🔒 Submissions Locked' }}}}
-      </button>
-    </form>
+      <div class="grid-4" style="font-size:14px; color:#a0a0a0; margin-bottom: 20px;">
+          <div><strong>Coding Time:</strong> {q.get('time_limit_minutes', 15)} min</div>
+          <div class="runtime-{{'slow' if RUNTIME_LIMIT > 3.0 else 'good'}}">
+              <strong>Runtime Limit:</strong> {RUNTIME_LIMIT} seconds
+          </div>
+          <div><strong>Memory Limit:</strong> {q.get('memory_limit_mb', 256)} MB</div>
+          <div><a href="{{{{ url_for('questions_list') }}}}">← Back to Sheet</a></div>
+      </div>
+      <div class="card flash-error" style="border-left-color:#fcd34d; background:#292929; color:#fcd34d; font-size:14px; text-align:center; margin-bottom: 20px;">
+          ⚠️ **AI DETECTION ACTIVE** ⚠️<br>
+          We believe in the power of your mind, not the power of the machine. Our judging system is equipped with **advanced AI detection technologies**. **Attempts to use external AI tools will result in disqualification.** Test your true skills and earn your knowledge.
+      </div>
+      <h4>💻 Write your code:</h4>
+      <form method="POST" action="{{{{ url_for('user_question', qid=q.id) }}}}">
+        <textarea id="code" name="code">{{{{ code_to_display }}}}</textarea> 
+        <br><br>
+        <button type="submit" {'disabled' if not is_submission_allowed else ''}>
+            {{{{ '▶️ Submit Code' if is_submission_allowed else '🔒 Submissions Locked' }}}}
+        </button>
+      </form>
 
-    {'{% if not is_submission_allowed and status != "OFFLINE" %}'}
-        <p class="small flash-error" style="margin-top:15px; text-align:center;">Submissions are only allowed when the contest status is **ACTIVE** AND your time has not expired.</p>
-    {'{% endif %}'}
-
-    {'{% if compile_error %}'}
-      <h4>❌ Compilation Error:</h4>
-      <pre style="color:#ef4444;">{{{{ compile_error }}}}</pre> 
-    {'{% endif %}'}
-
-    {'{% if overall_result %}'}
-      <h4>Final Result:</h4>
-      {'{% if overall_result == "Accepted" %}'}
-        <p class="accepted">✅ {{{{ overall_result }}}} (Passed {{{{ q.get('test_cases', [])|length }}}} / {{{{ q.get('test_cases', [])|length }}}} Cases)</p>
-      {'{% else %}'}
-        <p class="wrong">❌ {{{{ overall_result }}}}</p>
-
-        {'{% set first_failure = False %}'}
-        {'{% for tc in test_case_results %}'}
-            {'{% if tc.status != "Accepted" and not first_failure %}'}
-                {'{% set first_failure = True %}'}
-                <h4>❌ First Failed Test Case: {{{{ tc.status }}}}</h4>
-                <div class="grid-3">
-                    <div><label>Input:</label><pre>{{{{ tc.input }}}}</pre></div>
-                    <div><label>Your Output:</label><pre style="color:#ef4444;">{{{{ tc.output }}}}</pre></div>
-                    <div><label>Expected Output:</label><pre>{{{{ tc.expected }}}}</pre></div>
-                </div>
-                <p class="small" style="color:#fcd34d;">The test runner stops after the first incorrect result.</p>
-            {'{% endif %}'}
-        {'{% endfor %}'}
+      {'{% if not is_submission_allowed and status != "OFFLINE" %}'}
+          <p class="small flash-error" style="margin-top:15px; text-align:center;">Submissions are only allowed when the contest status is **ACTIVE** AND your time has not expired.</p>
       {'{% endif %}'}
-    {'{% endif %}'}
-  </div>
 
-  <script>
-    // --- CodeMirror Initialization ---
-    // Note: Theme is set to 'monokai' here
-    var editor = CodeMirror.fromTextArea(document.getElementById("code"), {{
-      lineNumbers: true,
-      mode: "text/x-c++src",
-      autoCloseBrackets: true,
-      indentUnit: 4,
-      theme: "monokai", 
-      readOnly: {{{{ 'true' if not is_submission_allowed else 'false' }}}}
-    }});
-    editor.setValue(document.getElementById("code").value.trim()); 
+      {'{% if compile_error %}'}
+        <h4>❌ Compilation Error:</h4>
+        <pre style="color:#ef4444;">{{{{ compile_error }}}}</pre> 
+      {'{% endif %}'}
 
-    // --- New Countdown Timer Script (HH:MM:SS format) ---
-    var timeRemaining = {time_remaining_seconds};
-    var countdownElement = document.getElementById('countdown');
-    var submitButton = document.querySelector('button[type="submit"]');
+      {'{% if overall_result %}'}
+        <h4>Final Result:</h4>
+        {'{% if overall_result == "Accepted" %}'}
+          <p class="accepted">✅ {{{{ overall_result }}}} (Passed {{{{ q.get('test_cases', [])|length }}}} / {{{{ q.get('test_cases', [])|length }}}} Cases)</p>
+        {'{% else %}'}
+          <p class="wrong">❌ {{{{ overall_result }}}}</p>
 
-    function formatTime(totalSeconds) {{
-        var hours = Math.floor(totalSeconds / 3600);
-        var minutes = Math.floor((totalSeconds % 3600) / 60);
-        var seconds = totalSeconds % 60;
+          {'{% set first_failure = False %}'}
+          {'{% for tc in test_case_results %}'}
+              {'{% if tc.status != "Accepted" and not first_failure %}'}
+                  {'{% set first_failure = True %}'}
+                  <h4>❌ First Failed Test Case: {{{{ tc.status }}}}</h4>
+                  <div class="grid-3">
+                      <div><label>Input:</label><pre>{{{{ tc.input }}}}</pre></div>
+                      <div><label>Your Output:</label><pre style="color:#ef4444;">{{{{ tc.output }}}}</pre></div>
+                      <div><label>Expected Output:</label><pre>{{{{ tc.expected }}}}</pre></div>
+                  </div>
+                  <p class="small" style="color:#fcd34d;">The test runner stops after the first incorrect result.</p>
+              {'{% endif %}'}
+          {'{% endfor %}'}
+        {'{% endif %}'}
+      {'{% endif %}'}
+    </div>
 
-        var parts = [];
-        if (hours > 0) parts.push((hours < 10 ? '0' + hours : hours));
+    <script>
+      // --- CodeMirror Initialization ---
+      var editor = CodeMirror.fromTextArea(document.getElementById("code"), {{
+        lineNumbers: true,
+        mode: "text/x-c++src",
+        autoCloseBrackets: true,
+        indentUnit: 4,
+        theme: "monokai", 
+        readOnly: {{{{ 'true' if not is_submission_allowed else 'false' }}}}
+      }});
+      editor.setValue(document.getElementById("code").value.trim()); 
 
-        parts.push(minutes < 10 ? '0' + minutes : minutes);
-        parts.push(seconds < 10 ? '0' + seconds : seconds);
+      // --- New Countdown Timer Script (HH:MM:SS format) ---
+      var timeRemaining = {time_remaining_seconds};
+      var countdownElement = document.getElementById('countdown');
+      var submitButton = document.querySelector('button[type="submit"]');
 
-        return parts.join(':');
-    }}
+      function formatTime(totalSeconds) {{
+          var hours = Math.floor(totalSeconds / 3600);
+          var minutes = Math.floor((totalSeconds % 3600) / 60);
+          var seconds = totalSeconds % 60;
 
-    function updateTimer() {{
-        if (timeRemaining <= 0) {{
-            timeRemaining = 0;
-            countdownElement.innerHTML = 'Time Expired';
-            if (submitButton) {{
-                submitButton.disabled = true;
-                submitButton.innerHTML = '🔒 Time Expired';
-            }}
-            clearInterval(timerInterval);
-            return;
-        }}
+          var parts = [];
+          if (hours > 0) parts.push((hours < 10 ? '0' + hours : hours));
 
-        countdownElement.innerHTML = formatTime(timeRemaining);
-        timeRemaining--;
-    }}
+          parts.push(minutes < 10 ? '0' + minutes : minutes);
+          parts.push(seconds < 10 ? '0' + seconds : seconds);
 
-    if (countdownElement) {{
-        updateTimer(); 
-        var timerInterval = setInterval(updateTimer, 1000);
-    }}
+          return parts.join(':');
+      }}
 
-  </script>
+      function updateTimer() {{
+          if (timeRemaining <= 0) {{
+              timeRemaining = 0;
+              countdownElement.innerHTML = 'Time Expired';
+              if (submitButton) {{
+                  submitButton.disabled = true;
+                  submitButton.innerHTML = '🔒 Time Expired';
+              }}
+              clearInterval(timerInterval);
+              return;
+          }}
+
+          countdownElement.innerHTML = formatTime(timeRemaining);
+          timeRemaining--;
+      }}
+
+      if (countdownElement) {{
+          updateTimer(); 
+          var timerInterval = setInterval(updateTimer, 1000);
+      }}
+
+    </script>
 """
 
     rendered_content = render_template_string(
@@ -1527,5 +1515,4 @@ int main() {
 
 if __name__ == '__main__':
     # WARNING: DO NOT USE FOR PUBLIC INTERNET HOSTING WITHOUT A SANDBOX/DOCKER.
-    # Access via: http://[YOUR_PUBLIC_IP]:5000/ (Requires Port Forwarding setup)
     app.run(host='0.0.0.0', debug=True)
