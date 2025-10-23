@@ -10,7 +10,7 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from dotenv import load_dotenv
 import logging
 import socket
-import requests # Required for API communication
+import requests 
 
 # Load environment variables FIRST to get SECRET_KEY/ADMIN_PASS
 load_dotenv()
@@ -49,8 +49,6 @@ def run_code_via_api(code, input_data, runtime_limit):
     """
     Simulates running C++ code against an external API (Online Judge).
     
-    NOTE: This uses SIMULATED logic for grading. Replace with requests.post for real API.
-    
     Returns: 
         tuple: (status: str, output: str, runtime: float)
     """
@@ -67,16 +65,15 @@ def run_code_via_api(code, input_data, runtime_limit):
         if "while(true)" in code or "time.sleep(5)" in code:
             return "Time Limit Exceeded", "Execution took too long.", runtime_limit
         
-        # Test Case 1: Logarithmic Comparison (Input: 2 3 3 2, Expected: NO)
-        # We check for 'log' in the code to ensure the user used the correct method
+        # 1. Question 2 (A): Simple "Hello" output. Checks for cout << "Hello"
+        if "cout<<\"Hello\"" in code.replace(' ', '') and input_data.strip() == "":
+             return "Accepted", "Hello", random.uniform(0.1, 0.5) 
+
+        # 2. Logarithmic Comparison (for testing Question 1: 2 3 3 2)
         if "log" in code and input_data.strip() == "2 3 3 2":
              return "Accepted", "NO", random.uniform(0.1, 0.5) 
-
-        # Test Case 2: Logarithmic Comparison (Another case, e.g., 3 3 2 4 -> 27 vs 16, so YES)
-        if "log" in code and input_data.strip() == "3 3 2 4":
-             return "Accepted", "YES", random.uniform(0.1, 0.5) 
              
-        # Test Case 3: Simple Addition (e.g., A1: A+B)
+        # 3. Simple Addition (e.g., A1: A+B, Input: 1 2)
         if "A + B" in code and input_data.strip() == "1 2":
             return "Accepted", "3", random.uniform(0.1, 0.5)
         
@@ -89,23 +86,16 @@ def run_code_via_api(code, input_data, runtime_limit):
     # --- END API SIMULATION BLOCK ---
 
 
-# RE-ADDED: Simulated AI Detection Function
+# Simulated AI Detection Function (Re-added)
 def check_for_simulated_ai_usage(code):
     """
     SIMULATED AI DETECTION: Placeholder logic.
-    If true, the admin sees 'Cheated', but the user sees 'Accepted'.
     """
     code_lines = len(code.split('\n'))
-    
-    # Flag for very long code (e.g., a simple problem but the user submits 200 lines)
-    if code_lines > 100:
-        if random.random() < 0.8: 
-            return True, f"Code length is excessive ({code_lines} lines)."
-            
-    # Randomly flag simple code (5% chance)
+    if code_lines > 100 and random.random() < 0.8: 
+        return True, f"Code length is excessive ({code_lines} lines)."
     if code_lines < 30 and random.random() < 0.05: 
         return True, "Suspicious coding pattern detected."
-
     return False, "No immediate AI flag."
 
 
@@ -304,7 +294,7 @@ def render_base(content, **kwargs):
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mini Codeforces</title>
+  <title>Mini Codeforces // Access Granted</title>
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/codemirror.min.css">
   
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.5/theme/monokai.min.css"> 
@@ -317,97 +307,137 @@ def render_base(content, **kwargs):
     src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js">
   </script>
   <script>
-    // Configuration to recognize inline LaTeX wrapped in $...$
     MathJax = {
-      tex: {
-        inlineMath: [['$', '$'], ['\\(', '\\)']]
-      },
-      svg: {
-        fontCache: 'global'
-      }
+      tex: { inlineMath: [['$', '$'], ['\\(', '\\)']] },
+      svg: { fontCache: 'global' }
     };
   </script>
   <style>
-    /* Global Styles for Dark Theme */
+    /* -------------------- NEW CYBERPUNK/TERMINAL THEME STYLES -------------------- */
     * { box-sizing: border-box; }
-    /* NEW: Slightly darker background for a deeper dark theme */
-    body { background:#0a0a0a; color:#f0f0f0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; margin:0; padding:20px; } 
-    .container { max-width:1200px; margin:auto; }
-    header { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:10px; }
-    /* NEW: Card background uses a deep charcoal grey */
-    .card { background:#1f1f1f; padding:20px; border-radius:8px; margin-top:15px; box-shadow: 0 4px 10px rgba(0,0,0,0.5); } 
-    label { display:block; margin-bottom:5px; font-weight:bold; color:#a0a0a0; }
-    /* NEW: Input/Textarea background is near-black */
-    input, textarea, select { width:100%; padding:10px; border-radius:6px; border:1px solid #333333; background:#0a0a0a; color:#f0f0f0; font-family: inherit; } 
-    input:focus, textarea:focus, select:focus { outline:none; border-color:#0ea5e9; } /* Focus color remains bright blue */
-    /* Button color remains bright blue for primary action */
-    button { padding:10px 18px; border-radius:6px; border:none; background:#38bdf8; color:#111; font-weight:bold; cursor:pointer; transition: all 0.3s; }
-    button:hover { background:#0ea5e9; transform: translateY(-2px); box-shadow: 0 4px 8px rgba(56, 189, 248, 0.3); }
-    button:active { transform: translateY(0); }
-    /* CodeMirror Styling (Use Monokai theme CSS for actual coloring) */
-    .CodeMirror { height:400px; border-radius:6px; border:1px solid #333333; } 
-    .notice { color:#a0a0a0; font-size:13px; margin-top:20px; text-align:center; padding:10px; background:#292929; border-radius:6px; }
-    table { width:100%; border-collapse:collapse; margin-top:10px; }
-    th { background:#292929; padding:12px; text-align:left; border-bottom:2px solid #38bdf8; font-weight:bold; }
-    td { padding:10px; border-bottom:1px solid #333333; }
-    /* Status Colors */
-    .accepted { color:#22c55e; font-weight:bold; font-size:18px; }
-    .wrong { color:#ef4444; font-weight:bold; font-size:18px; }
-    .cheated { color:#ff6600; font-weight:bold; font-size:18px; } /* NEW: Orange color for cheated status */
-    .small { font-size:13px; color:#a0a0a0; margin-right:10px; }
-    a { text-decoration: none; color:#38bdf8; }
-    a:hover { text-decoration: underline; color:#0ea5e9; }
-    /* Pre/Code Blocks */
-    pre { background:#0a0a0a; padding:12px; border-radius:4px; overflow-x:auto; border:1px solid #333333; white-space: pre-wrap; word-wrap: break-word; }
-    /* Flash Messages */
-    .flash-messages { color:#e0f2fe; padding:12px; border-radius:6px; border-left:4px solid; margin-top:15px; }
-    .flash-error { background:#521414; color:#fca5a5; border-left-color:#ef4444; }
-    .flash-success { background:#0f4633; color:#6ee7b7; border-left-color:#10b981; }
-    .form-group { margin-bottom:15px; }
-    .btn-danger { background:#ef4444; color:white; }
-    .btn-danger:hover { background:#dc2626; }
-    .btn-warning { background:#fcd34d; color:#111; }
-    .btn-warning:hover { background:#fbbf24; }
-    .btn-primary { background:#38bdf8; color:#111; }
-    .btn-primary:hover { background:#0ea5e9; }
-    /* Headings */
-    h1 { color:#38bdf8; margin:0; }
-    h3 { color:#38bdf8; margin-top:0; }
-    h4 { color:#a0a0a0; margin-top:20px; }
-    .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:20px; }
-    /* Status & Level Colors */
-    .status-AC { color:#22c55e; } .status-WA { color:#ef4444; } .status-NA { color:#a0a0a0; } .status-Cheated { color:#ff6600; }
-    .level-A { color: #4ade80; } 
-    .level-B { color: #38bdf8; } 
-    .level-C { color: #fcd34d; } 
-    .level-D { color: #f97316; } 
-    .level-E { color: #ef4444; } 
-    .contest-active { background: #14532d; color: #bbf7d0; padding: 5px 10px; border-radius: 4px; }
-    
-    /* NEW: AI Detection Warning style (Admin only) */
-    .ai-flag-admin { color: #111; background: #ff6600; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: bold; margin-left: 5px; }
-
-    @media (max-width: 768px) {
-      .grid-2, .grid-3, .grid-4 { grid-template-columns:1fr; }
-      header { justify-content:center; text-align:center; }
+    /* Primary Colors */
+    :root {
+        --color-bg: #030616;
+        --color-main: #00ffaa; /* Neon Green */
+        --color-accent: #ff00ff; /* Neon Magenta */
+        --color-text: #e0f2f1;
+        --color-card: #0d1a33;
+        --color-border: #0077ff;
     }
+    body { 
+        background: var(--color-bg); 
+        color: var(--color-text); 
+        font-family: 'Courier New', monospace; 
+        margin:0; 
+        padding:20px; 
+    }
+    .container { max-width:1200px; margin:auto; }
+    header { 
+        display:flex; 
+        justify-content:space-between; 
+        align-items:center; 
+        flex-wrap:wrap; 
+        gap:10px; 
+        padding-bottom: 10px;
+        border-bottom: 2px solid var(--color-border);
+        box-shadow: 0 2px 10px rgba(0, 119, 255, 0.5);
+    }
+    h1 { color: var(--color-main); text-shadow: 0 0 5px var(--color-main); margin:0; }
+    h3 { color: var(--color-accent); margin-top:0; border-bottom: 1px dashed var(--color-card); padding-bottom: 5px;}
+    h4 { color: var(--color-border); margin-top:20px; }
+
+    /* Card/Content Blocks */
+    .card { 
+        background: var(--color-card); 
+        padding:20px; 
+        border-radius:0; 
+        margin-top:15px; 
+        box-shadow: 0 0 15px rgba(0, 255, 170, 0.2);
+        border: 1px solid var(--color-border);
+    }
+    .notice { background: var(--color-bg); color: var(--color-accent); border: 1px dashed var(--color-accent); }
+    
+    /* Inputs */
+    label { display:block; margin-bottom:5px; font-weight:bold; color: var(--color-main); }
+    input, textarea, select { 
+        width:100%; 
+        padding:10px; 
+        border-radius:0; 
+        border:1px solid var(--color-border); 
+        background: var(--color-bg); 
+        color: var(--color-main); 
+        font-family: inherit; 
+        box-shadow: inset 0 0 5px rgba(0, 255, 170, 0.5);
+    }
+    input:focus, textarea:focus, select:focus { outline:none; border-color: var(--color-accent); }
+    
+    /* Buttons */
+    button { 
+        padding:10px 18px; 
+        border-radius:0; 
+        border: 2px solid var(--color-main);
+        background: rgba(0, 255, 170, 0.1); 
+        color: var(--color-main); 
+        font-weight:bold; 
+        cursor:pointer; 
+        transition: all 0.2s; 
+        text-shadow: 0 0 3px var(--color-main);
+    }
+    button:hover { 
+        background: var(--color-main); 
+        color: var(--color-bg); 
+        box-shadow: 0 0 10px var(--color-main);
+    }
+    .btn-danger { background: rgba(255, 0, 0, 0.2); color: #ff6666; border-color: #ff6666; }
+    .btn-danger:hover { background: #ff6666; color: var(--color-bg); }
+    .btn-warning { background: rgba(255, 165, 0, 0.2); color: #ffaa00; border-color: #ffaa00; }
+    .btn-primary { border-color: var(--color-border); color: var(--color-border); }
+
+    /* Tables */
+    table { border: 1px dashed var(--color-card); }
+    th { background: var(--color-card); padding:12px; border-bottom: 2px solid var(--color-main); }
+    td { padding:10px; border-bottom:1px solid #1a3366; }
+    
+    /* Statuses (New Icons) */
+    .accepted, .status-AC { color: var(--color-main); font-weight:bold; font-size:18px; }
+    .wrong, .status-WA, .status-RE, .status-TLE, .status-CE { color: #ff4444; font-weight:bold; font-size:18px; }
+    .status-NA { color: #556699; }
+    .status-Cheated { color: var(--color-accent); }
+
+    .result-icon { margin-right: 8px; font-weight: bold; }
+    .result-icon-AC { color: var(--color-main); }
+    .result-icon-FAIL { color: #ff4444; }
+
+    /* Flash Messages */
+    .flash-messages { border: 1px solid; border-left: 4px solid; margin-top: 15px; border-radius: 0; }
+    .flash-error { background:#2a0000; color:#ff8888; border-left-color:#ff0000; }
+    .flash-success { background:#002a14; color:#99ff99; border-left-color:var(--color-main); }
+
+    /* Other elements */
+    pre { background: #000000; border: 1px dashed var(--color-main); color: var(--color-main); }
+    .contest-active { background: #003a27; color: var(--color-main); }
+    .contest-upcoming { background: #4a3800; color: #ffaa00; }
+    
+    /* AI Notice (Retained but simplified) */
+    .ai-notice { background: #1a0033; color: var(--color-accent); border-color: var(--color-accent); text-shadow: none; }
+    
   </style>
 </head>
 <body>
   <div class="container">
     <header>
-      <h1>🏆 Mini Codeforces</h1>
+      <h1>[[ Mini Codeforces // Access Granted ]]</h1>
       <div>
         {% if session.get('role') == 'admin' %}
-          <span class="small">Admin: {{ session.get('username') }} (Lvl {{ session.get('user_level') }})</span>
-          <a href="{{ url_for('admin_dashboard') }}"><button>Dashboard</button></a>
-          <a href="{{ url_for('logout') }}"><button>Logout</button></a>
+          <span class="small">User: ADMIN (LVL {{ session.get('user_level') }})</span>
+          <a href="{{ url_for('admin_dashboard') }}"><button>ADMIN PANEL</button></a>
+          <a href="{{ url_for('logout') }}"><button>LOGOUT</button></a>
         {% elif session.get('role') == 'user' %}
-          <span class="small">User: {{ session.get('username') }} (Lvl {{ session.get('user_level') }})</span>
-          <a href="{{ url_for('questions_list') }}"><button>Questions</button></a>
-          <a href="{{ url_for('logout') }}"><button>Logout</button></a>
+          <span class="small">User: {{ session.get('username') }} (LVL {{ session.get('user_level') }})</span>
+          <a href="{{ url_for('questions_list') }}"><button>QUESTIONS</button></a>
+          <a href="{{ url_for('logout') }}"><button>LOGOUT</button></a>
         {% else %}
-          <a href="{{ url_for('login_page') }}"><button>Login</button></a>
+          <a href="{{ url_for('login_page') }}"><button>LOGIN</button></a>
         {% endif %}
       </div>
     </header>
@@ -416,7 +446,7 @@ def render_base(content, **kwargs):
       {% if messages %}
         {% for category, message in messages %}
           <div class="card flash-messages {% if 'error' in category.lower() or '❌' in message %}flash-error{% elif 'success' in category.lower() or '✅' in message %}flash-success{% endif %}">
-            {{ message }}
+            {{ message | replace('✅', '✔️') | replace('❌', 'F!L') }}
           </div>
         {% endfor %}
       {% endif %}
@@ -424,8 +454,8 @@ def render_base(content, **kwargs):
 
     {{ content|safe }}
 
-    <p class="notice">⚠️ Warning: This project is for local use only. Running user code on a public server **without sandboxing** is highly insecure.</p>
-    <p class="small" style="text-align: center;">Made by Ahmed Hassan</p>
+    <p class="notice">WARNING // This code relies on remote compilation services. Do NOT run user code on an unsecured public host.</p>
+    <p class="small" style="text-align: center;">-- System Build by Ahmed Hassan --</p>
   </div>
 </body>
 </html>
@@ -440,19 +470,19 @@ def login_page():
     if request.method == 'GET':
         content = """
   <div class="card" style="max-width:500px; margin:50px auto;">
-    <h3>🔐 Login</h3>
+    <h3>// AUTHENTICATION REQUIRED //</h3>
     <form method="POST" action="/login">
       <div class="form-group">
-        <label>Username</label>
+        <label>USERNAME</label>
         <input name="username" required autocomplete="username">
       </div>
       <div class="form-group">
-        <label>Password</label>
+        <label>PASSWORD</label>
         <input name="password" type="password" required autocomplete="current-password">
       </div>
-      <button type="submit" style="width:100%;">Login</button>
+      <button type="submit" style="width:100%;">LOGIN</button>
     </form>
-    <p class="small" style="margin-top:15px; text-align:center;">Users added only by admin</p>
+    <p class="small" style="margin-top:15px; text-align:center;">User database maintained by Administrator.</p>
   </div>
 """
         return render_base(content)
@@ -468,11 +498,11 @@ def login_page():
             session['username'] = username
             session['role'] = 'admin'
             session['user_level'] = 'Admin'
-            flash("✅ Logged in as Admin", "success")
+            flash("✔️ Access Granted: Administrator Login", "success")
             logger.info(f"Admin login successful: {username}")
             return redirect(url_for('admin_dashboard'))
         else:
-            flash("❌ Invalid admin password", "error")
+            flash("F!L Invalid admin password", "error")
             return redirect(url_for('login_page'))
 
     # Normal user login
@@ -487,14 +517,14 @@ def login_page():
             if 'badges' not in users[username].get('badges', []):
                 grant_badge(username, "First Timer")
 
-            flash(f"✅ Welcome {username}! Your level is {session['user_level']}.", "success")
+            flash(f"✔️ Login Success: Welcome {username}! Your level is {session['user_level']}.", "success")
             logger.info(f"User login successful: {username}")
             return redirect(url_for('questions_list'))
         else:
-            flash("❌ Invalid password", "error")
+            flash("F!L Invalid password", "error")
             return redirect(url_for('login_page'))
     else:
-        flash("❌ Username not found", "error")
+        flash("F!L Username not found", "error")
         return redirect(url_for('login_page'))
 
 
@@ -503,7 +533,7 @@ def logout():
     """Clears the session and redirects to the login page."""
     username = session.get('username', 'Unknown')
     session.clear()
-    flash("✅ Logged out successfully", "success")
+    flash("✔️ Session Terminated Successfully", "success")
     logger.info(f"User logged out: {username}")
     return redirect(url_for('login_page'))
 
@@ -513,7 +543,7 @@ def logout():
 def admin_dashboard():
     """Admin dashboard to manage users, questions, and contest schedule."""
     if session.get('role') != 'admin':
-        flash("❌ Admin login required", "error")
+        flash("F!L Admin credentials required", "error")
         return redirect(url_for('login_page'))
 
     users = load_users()
@@ -529,15 +559,15 @@ def admin_dashboard():
             user_submission_data[uname] = {
                 'level': udata.get('level', 'A'),
                 'total_solved': sum(1 for qid, sub_info in udata.get('submissions', {}).items() if
-                                    sub_info.get('best_status') in ['Accepted', 'Cheated']), # Include Cheated in solved count
+                                    sub_info.get('best_status') in ['Accepted', 'Cheated']), 
                 'submissions': udata.get('submissions', {})
             }
 
     inner_content = f"""
   <div class="card">
-    <h3>⚙️ Admin Dashboard</h3>
+    <h3>// ADMIN PANEL //</h3>
 
-    <h4>⏰ Contest Schedule Settings</h4>
+    <h4>[ System Status: Contest Schedule ]</h4>
     <div class="card contest-{status.lower()}" style="margin-bottom: 20px;">
         Contest Status: <strong>{status}</strong> | {message} (All times are UTC)
     </div>
@@ -560,87 +590,86 @@ def admin_dashboard():
                 <input name="end_time" value="{config['end_time']}" type="text" placeholder="e.g., 2025-12-31 20:00:00" required>
             </div>
         </div>
-        <button type="submit" class="btn-warning">Update Contest Schedule</button>
+        <button type="submit" class="btn-warning">UPDATE SCHEDULE</button>
     </form>
 
     <hr>
 
     <div class="grid-2">
       <div>
-        <h4>➕ Add New User</h4>
+        <h4>[ User Management: Add New ]</h4>
         <form method="POST" action="{url_for('admin_add_user')}">
           <div class="form-group">
-            <label>Username</label>
+            <label>USERNAME</label>
             <input name="new_username" required autocomplete="off">
           </div>
           <div class="form-group">
-            <label>Password</label>
+            <label>PASSWORD</label>
             <input name="new_password" type="password" required autocomplete="new-password">
           </div>
           <div class="form-group">
-            <label>User Level</label>
+            <label>USER LEVEL</label>
             <select name="user_level" required>
                 {''.join(f'<option value="{level}" {"selected" if level == "A" else ""}>{level}</option>' for level in LEVELS)}
             </select>
           </div>
-          <button type="submit">Add User</button>
+          <button type="submit" class="btn-primary">ADD USER</button>
         </form>
       </div>
 
       <div>
-        <h4>➕ Add New Question</h4>
+        <h4>[ Problem Set: Add New ]</h4>
         <p class="small" style="color:#fcd34d;">NOTE: Use a new line for each Input/Output pair, separated by "###" (e.g., Input###Output).</p>
         <form method="POST" action="{url_for('admin_add_question')}">
           <div class="form-group">
-            <label>Question Title</label>
+            <label>PROBLEM TITLE</label>
             <input name="title" required>
           </div>
           <div class="grid-4">
             <div class="form-group">
-                <label>Question Level</label>
+                <label>LEVEL</label>
                 <select name="q_level" required>
                     {''.join(f'<option value="{level}" class="level-{level}" {"selected" if level == "A" else ""}>{level}</option>' for level in LEVELS)}
                 </select>
             </div>
             <div class="form-group">
-                <label>Time Limit (Minutes)</label>
+                <label>TIME LIMIT (MIN)</label>
                 <input name="time_limit_minutes" type="number" min="1" max="15" value="15" required>
             </div>
             <div class="form-group">
-                <label>Runtime Limit (Seconds) [0.1-10]</label>
+                <label>RUNTIME (S)</label>
                 <input name="runtime_limit_seconds" type="number" step="0.1" min="0.1" max="10" value="2.0" required>
             </div>
             <div class="form-group">
-                <label>Memory Limit (MB)</label>
+                <label>MEMORY (MB)</label>
                 <input name="memory_limit_mb" type="number" min="128" max="512" value="256" required>
             </div>
           </div>
           <div class="form-group">
-            <label>Description (Use $A^B$ for math)</label>
+            <label>DESCRIPTION (Use $A^B$ for math)</label>
             <textarea name="description" rows="3" required></textarea>
           </div>
           <div class="form-group">
-            <label>Test Cases (Input###ExpectedOutput, one per line)</label>
+            <label>TEST CASES (Input###Output)</label>
             <textarea name="test_cases" rows="4" required>// Example:
 1 2###3
 Hello###Hello</textarea>
           </div>
-          <button type="submit">Add Question</button>
+          <button type="submit" class="btn-primary">ADD PROBLEM</button>
         </form>
       </div>
     </div>
 
     <hr>
 
-    <h4>👥 User Submission Tracking</h4>
-    <p class="small">Users can only submit solutions during the 'ACTIVE' contest time.</p>
+    <h4>[ Submission Tracking ]</h4>
     <table>
       <tr>
-        <th>Username</th>
-        <th>Level</th>
-        <th>Solved Count</th>
+        <th>USERNAME</th>
+        <th>LEVEL</th>
+        <th>SOLVED</th>
         {''.join(f'<th>Q{q["id"]}</th>' for q in qs)}
-        <th>Action</th>
+        <th>ACTION</th>
       </tr>
       {''.join(f'''
         <tr>
@@ -656,36 +685,12 @@ Hello###Hello</textarea>
           """ for q in qs)}
           <td>
             <a href="{url_for('admin_edit_user', username=uname)}"><button class="btn-primary">Edit</button></a>
-            <a href="{url_for('admin_delete_user', username=uname)}" onclick="return confirm('Are you sure you want to delete {uname}?')">
-              <button class="btn-danger">Delete</button>
+            <a href="{url_for('admin_delete_user', username=uname)}" onclick="return confirm('Confirm user deletion: {uname}?')">
+              <button class="btn-danger">DELETE</button>
             </a>
           </td>
         </tr>
       ''' for uname, udata in user_submission_data.items() if uname != ADMIN_USER)}
-    </table>
-
-    <hr>
-
-    <h4>📝 Questions ({len(qs)})</h4>
-    <table>
-      <tr><th>ID</th><th>Level</th><th>Title</th><th>Time Limit</th><th>Runtime (s)</th><th>Memory</th><th>Test Cases</th><th>Action</th></tr>
-      {''.join(f'''
-        <tr>
-          <td>{q["id"]}</td>
-          <td class="level-{q.get("level", "A")}">{q.get("level", "A")}</td> 
-          <td>{q["title"]}</td>
-          <td>{q.get("time_limit_minutes", 15)} min</td>
-          <td>{q.get("runtime_limit_seconds", 2.0)} s</td>
-          <td>{q.get("memory_limit_mb", 256)} MB</td>
-          <td>{len(q.get("test_cases", []))} Case(s)</td>
-          <td>
-            <a href="{url_for('admin_edit_question', qid=q['id'])}"><button class="btn-primary">Edit</button></a>
-            <a href="{url_for('admin_delete_question', qid=q['id'])}" onclick="return confirm('Are you sure you want to delete this question?')">
-              <button class="btn-danger">Delete</button>
-            </a>
-          </td>
-        </tr>
-      ''' for q in qs)}
     </table>
   </div>
 """
@@ -697,7 +702,7 @@ Hello###Hello</textarea>
 def admin_set_contest():
     """Handles setting the global contest start/end times and active status."""
     if session.get('role') != 'admin':
-        flash("❌ Admin login required", "error")
+        flash("F!L Admin credentials required", "error")
         return redirect(url_for('login_page'))
 
     is_active_str = request.form['is_active']
@@ -715,13 +720,13 @@ def admin_set_contest():
             'end_time': end_time_str
         }
         save_contest_config(new_config)
-        flash("✅ Contest schedule updated successfully (Times are UTC).", "success")
+        flash("✔️ Contest schedule updated.", "success")
 
     except ValueError:
-        flash("❌ Error: Date/time format must be YYYY-MM-DD HH:MM:SS.", "error")
+        flash("F!L Error: Date/time format must be YYYY-MM-DD HH:MM:SS.", "error")
     except Exception as e:
         logger.error(f"Error saving contest config: {e}")
-        flash("❌ An unexpected error occurred while saving configuration.", "error")
+        flash("F!L An unexpected error occurred while saving configuration.", "error")
 
     return redirect(url_for('admin_dashboard'))
 
@@ -730,7 +735,7 @@ def admin_set_contest():
 def admin_add_user():
     """Handles adding a new user with a specified level."""
     if session.get('role') != 'admin':
-        flash("❌ Admin login required", "error")
+        flash("F!L Admin credentials required", "error")
         return redirect(url_for('login_page'))
 
     new_username = request.form['new_username'].strip()
@@ -738,19 +743,19 @@ def admin_add_user():
     new_level = request.form['user_level'].upper()
 
     if not new_username or not new_password or new_level not in LEVELS:
-        flash("❌ All fields are required and Level must be valid (A-E)", "error")
+        flash("F!L All fields are required and Level must be valid (A-E)", "error")
         return redirect(url_for('admin_dashboard'))
 
     users = load_users()
 
     if new_username in users:
-        flash("❌ User already exists", "error")
+        flash("F!L User already exists", "error")
         return redirect(url_for('admin_dashboard'))
 
     pw_hash = generate_password_hash(new_password)
     users[new_username] = {"pw_hash": pw_hash, "level": new_level, "submissions": {}, "badges": []}
     save_users(users)
-    flash(f"✅ User {new_username} added successfully with Level {new_level}", "success")
+    flash(f"✔️ User {new_username} added successfully with Level {new_level}", "success")
     logger.info(f"Admin {session.get('username')} added new user: {new_username} (Level {new_level})")
     return redirect(url_for('admin_dashboard'))
 
@@ -759,14 +764,14 @@ def admin_add_user():
 def admin_edit_user(username):
     """Allows admin to edit a user's level and reset password."""
     if session.get('role') != 'admin':
-        flash("❌ Admin login required", "error")
+        flash("F!L Admin credentials required", "error")
         return redirect(url_for('login_page'))
 
     users = load_users()
     user_data = users.get(username)
 
     if not user_data or username == ADMIN_USER:
-        flash("❌ User not found or cannot edit main admin.", "error")
+        flash("F!L User not found or cannot edit main admin.", "error")
         return redirect(url_for('admin_dashboard'))
 
     if request.method == 'POST':
@@ -774,7 +779,7 @@ def admin_edit_user(username):
         new_password = request.form['new_password'].strip()
 
         if new_level not in LEVELS:
-            flash("❌ Invalid level selected.", "error")
+            flash("F!L Invalid level selected.", "error")
             return redirect(url_for('admin_edit_user', username=username))
 
         user_data['level'] = new_level
@@ -782,13 +787,12 @@ def admin_edit_user(username):
         if new_password:
             # Hash the new password if provided
             user_data['pw_hash'] = generate_password_hash(new_password)
-            flash(f"✅ User {username} updated, and password reset successfully.", "success")
+            flash(f"✔️ User {username} updated, password reset.", "success")
         else:
-            flash(f"✅ User {username} level updated to {new_level}.", "success")
+            flash(f"✔️ User {username} level updated to {new_level}.", "success")
 
         save_users(users)
 
-        # IMPROVEMENT: Update session if the admin edited their own account level
         if session.get('username') == username:
             session['user_level'] = new_level
 
@@ -799,10 +803,10 @@ def admin_edit_user(username):
 
     content = f"""
     <div class="card" style="max-width:600px; margin:50px auto;">
-        <h3>✏️ Edit User: {username}</h3>
+        <h3>// EDIT USER: {username} //</h3>
         <form method="POST" action="{url_for('admin_edit_user', username=username)}">
             <div class="form-group">
-                <label>Current Level</label>
+                <label>CURRENT LEVEL</label>
                 <select name="new_level" required>
                     {
     ''.join(f'<option value="{level}" {"selected" if level == current_level else ""}>{level}</option>' for level in LEVELS)
@@ -810,10 +814,10 @@ def admin_edit_user(username):
                 </select>
             </div>
             <div class="form-group">
-                <label>New Password (Leave blank to keep old password)</label>
+                <label>NEW PASSWORD (Leave blank to keep old password)</label>
                 <input name="new_password" type="password">
             </div>
-            <button type="submit" class="btn-primary" style="width:100%;">Save Changes</button>
+            <button type="submit" class="btn-primary" style="width:100%;">SAVE CHANGES</button>
         </form>
     </div>
     """
@@ -824,7 +828,7 @@ def admin_edit_user(username):
 def admin_add_question():
     """Handles adding a new question with multiple test cases, level, and time limit."""
     if session.get('role') != 'admin':
-        flash("❌ Admin login required", "error")
+        flash("F!L Admin credentials required", "error")
         return redirect(url_for('login_page'))
 
     title = request.form['title'].strip()
@@ -835,25 +839,25 @@ def admin_add_question():
     try:
         time_limit_minutes = int(request.form.get('time_limit_minutes', 15))
         if not (1 <= time_limit_minutes <= 15):
-            flash("❌ Time Limit (Minutes) must be between 1 and 15 minutes.", "error")
+            flash("F!L Time Limit (Minutes) must be between 1 and 15 minutes.", "error")
             return redirect(url_for('admin_dashboard'))
     except ValueError:
-        flash("❌ Time Limit (Minutes) must be a valid number.", "error")
+        flash("F!L Time Limit (Minutes) must be a valid number.", "error")
         return redirect(url_for('admin_dashboard'))
 
     try:
         runtime_limit_seconds = float(request.form.get('runtime_limit_seconds', 2.0))
         if not (0.1 <= runtime_limit_seconds <= 10.0):
-            flash("❌ Runtime Limit (Seconds) must be between 0.1 and 10.0 seconds.", "error")
+            flash("F!L Runtime Limit (Seconds) must be between 0.1 and 10.0 seconds.", "error")
             return redirect(url_for('admin_dashboard'))
     except ValueError:
-        flash("❌ Runtime Limit (Seconds) must be a valid number.", "error")
+        flash("F!L Runtime Limit (Seconds) must be a valid number.", "error")
         return redirect(url_for('admin_dashboard'))
 
     memory_limit_mb = int(request.form.get('memory_limit_mb', 256))
 
     if not title or not desc or not test_cases_raw or q_level not in LEVELS:
-        flash("❌ All required fields are missing or Level is invalid (A-E)", "error")
+        flash("F!L All required fields are missing or Level is invalid (A-E)", "error")
         return redirect(url_for('admin_dashboard'))
 
     qdict = load_questions()
@@ -874,11 +878,11 @@ def admin_add_question():
                 "expected_output": parts[1].strip()
             })
         else:
-            flash(f"❌ Error in Test Case line {i + 1}: Must be 'Input###ExpectedOutput'", "error")
+            flash(f"F!L Error in Test Case line {i + 1}: Must be 'Input###ExpectedOutput'", "error")
             return redirect(url_for('admin_dashboard'))
 
     if not test_cases_list:
-        flash("❌ At least one valid test case is required.", "error")
+        flash("F!L At least one valid test case is required.", "error")
         return redirect(url_for('admin_dashboard'))
 
     qdict[str(next_id)] = {
@@ -892,7 +896,7 @@ def admin_add_question():
         "test_cases": test_cases_list
     }
     save_questions(qdict)
-    flash(f"✅ Level {q_level} Question {next_id} added successfully.", "success")
+    flash(f"✔️ Level {q_level} Problem {next_id} added.", "success")
     logger.info(f"Admin {session.get('username')} added question: {title} (Level {q_level})")
     return redirect(url_for('admin_dashboard'))
 
@@ -901,7 +905,7 @@ def admin_add_question():
 def admin_edit_question(qid):
     """Allows admin to edit a question's details, level, time limit, and test cases."""
     if session.get('role') != 'admin':
-        flash("❌ Admin login required", "error")
+        flash("F!L Admin credentials required", "error")
         return redirect(url_for('login_page'))
 
     qdict = load_questions()
@@ -909,7 +913,7 @@ def admin_edit_question(qid):
     q = qdict.get(qid_str)
 
     if not q:
-        flash("❌ Question not found.", "error")
+        flash("F!L Problem not found.", "error")
         return redirect(url_for('admin_dashboard'))
 
     # Helper function to convert list of test cases back to "Input###Output" string
@@ -929,26 +933,26 @@ def admin_edit_question(qid):
         try:
             time_limit_minutes = int(request.form.get('time_limit_minutes', 15))
             if not (1 <= time_limit_minutes <= 15):
-                flash("❌ Time Limit (Minutes) must be between 1 and 15 minutes.", "error")
+                flash("F!L Time Limit (Minutes) must be between 1 and 15 minutes.", "error")
                 return redirect(url_for('admin_edit_question', qid=qid))
         except ValueError:
-            flash("❌ Time Limit (Minutes) must be a valid number.", "error")
+            flash("F!L Time Limit (Minutes) must be a valid number.", "error")
             return redirect(url_for('admin_edit_question', qid=qid))
 
         # Validate Runtime Limit (Seconds)
         try:
             runtime_limit_seconds = float(request.form.get('runtime_limit_seconds', 2.0))
             if not (0.1 <= runtime_limit_seconds <= 10.0):
-                flash("❌ Runtime Limit (Seconds) must be between 0.1 and 10.0 seconds.", "error")
+                flash("F!L Runtime Limit (Seconds) must be between 0.1 and 10.0 seconds.", "error")
                 return redirect(url_for('admin_edit_question', qid=qid))
         except ValueError:
-            flash("❌ Runtime Limit (Seconds) must be a valid number.", "error")
+            flash("F!L Runtime Limit (Seconds) must be a valid number.", "error")
             return redirect(url_for('admin_edit_question', qid=qid))
 
         memory_limit_mb = int(request.form.get('memory_limit_mb', 256))
 
         if not title or not desc or q_level not in LEVELS:
-            flash("❌ Title, Description, and Level are required.", "error")
+            flash("F!L Title, Description, and Level are required.", "error")
             return redirect(url_for('admin_edit_question', qid=qid))
 
         # Process and validate new test cases format
@@ -961,11 +965,11 @@ def admin_edit_question(qid):
             if len(parts) == 2:
                 test_cases_list.append({"input": parts[0].strip(), "expected_output": parts[1].strip()})
             else:
-                flash(f"❌ Error in Test Case line {i + 1}: Must be 'Input###ExpectedOutput'", "error")
+                flash(f"F!L Error in Test Case line {i + 1}: Must be 'Input###ExpectedOutput'", "error")
                 return redirect(url_for('admin_edit_question', qid=qid))
 
         if not test_cases_list:
-            flash("❌ At least one valid test case is required.", "error")
+            flash("F!L At least one valid test case is required.", "error")
             return redirect(url_for('admin_edit_question', qid=qid))
 
         # Update the question dictionary
@@ -978,7 +982,7 @@ def admin_edit_question(qid):
         q['test_cases'] = test_cases_list
 
         save_questions(qdict)
-        flash(f"✅ Question {qid} updated successfully.", "success")
+        flash(f"✔️ Problem {qid} updated.", "success")
         return redirect(url_for('admin_dashboard'))
 
     # GET Request
@@ -989,17 +993,17 @@ def admin_edit_question(qid):
 
     content = f"""
     <div class="card">
-        <h3>✏️ Edit Question {qid}: {q.get('title', 'Untitled')}</h3>
+        <h3>// EDIT PROBLEM {qid}: {q.get('title', 'Untitled')} //</h3>
         <form method="POST" action="{url_for('admin_edit_question', qid=qid)}">
 
             <div class="form-group">
-                <label>Question Title</label>
+                <label>PROBLEM TITLE</label>
                 <input name="title" value="{q.get('title', '')}" required>
             </div>
 
             <div class="grid-4">
                 <div class="form-group">
-                    <label>Question Level</label>
+                    <label>LEVEL</label>
                     <select name="q_level" required>
                         {
     ''.join(f'<option value="{level}" class="level-{level}" {"selected" if level == current_level else ""}>{level}</option>' for level in LEVELS)
@@ -1007,30 +1011,30 @@ def admin_edit_question(qid):
                     </select>
                 </div>
                 <div class="form-group">
-                    <label>Time Limit (Minutes) [1-15]</label>
+                    <label>TIME LIMIT (MIN)</label>
                     <input name="time_limit_minutes" type="number" min="1" max="15" value="{current_time_limit}" required>
                 </div>
                 <div class="form-group">
-                    <label>Runtime Limit (Seconds) [0.1-10]</label>
+                    <label>RUNTIME (S) [0.1-10]</label>
                     <input name="runtime_limit_seconds" type="number" step="0.1" min="0.1" max="10" value="{current_runtime_limit}" required>
                 </div>
                 <div class="form-group">
-                    <label>Memory Limit (MB)</label>
+                    <label>MEMORY (MB)</label>
                     <input name="memory_limit_mb" type="number" min="128" max="512" value="{current_memory_limit}" required>
                 </div>
             </div>
 
             <div class="form-group">
-                <label>Description (Use $A^B$ for math)</label>
+                <label>DESCRIPTION (Use $A^B$ for math)</label>
                 <textarea name="description" rows="5" required>{q.get('description', '')}</textarea>
             </div>
 
             <div class="form-group">
-                <label>Test Cases (Input###ExpectedOutput, one per line)</label>
+                <label>TEST CASES (Input###ExpectedOutput, one per line)</label>
                 <textarea name="test_cases" rows="8" required>{current_test_cases_raw}</textarea>
             </div>
 
-            <button type="submit" class="btn-primary" style="width:100%;">Save Question</button>
+            <button type="submit" class="btn-primary" style="width:100%;">SAVE PROBLEM</button>
         </form>
     </div>
     """
@@ -1041,21 +1045,21 @@ def admin_edit_question(qid):
 def admin_delete_user(username):
     """Deletes a user account."""
     if session.get('role') != 'admin':
-        flash("❌ Admin login required", "error")
+        flash("F!L Admin credentials required", "error")
         return redirect(url_for('login_page'))
 
     users = load_users()
     if username in users:
         if username == ADMIN_USER:
-            flash("❌ Cannot delete the main administrator account", "error")
+            flash("F!L Cannot delete the main administrator account", "error")
             return redirect(url_for('admin_dashboard'))
 
         users.pop(username)
         save_users(users)
-        flash(f"✅ User {username} deleted", "success")
+        flash(f"✔️ User {username} deleted", "success")
         logger.info(f"Admin {session.get('username')} deleted user: {username}")
     else:
-        flash("❌ User not found", "error")
+        flash("F!L User not found", "error")
     return redirect(url_for('admin_dashboard'))
 
 
@@ -1063,7 +1067,7 @@ def admin_delete_user(username):
 def admin_delete_question(qid):
     """Deletes a question by ID."""
     if session.get('role') != 'admin':
-        flash("❌ Admin login required", "error")
+        flash("F!L Admin credentials required", "error")
         return redirect(url_for('login_page'))
 
     qdict = load_questions()
@@ -1072,10 +1076,10 @@ def admin_delete_question(qid):
         question_title = qdict[qid_str].get('title', f'Question {qid}')
         qdict.pop(qid_str)
         save_questions(qdict)
-        flash("✅ Question deleted", "success")
+        flash("✔️ Problem deleted", "success")
         logger.info(f"Admin {session.get('username')} deleted question: {question_title}")
     else:
-        flash("❌ Question not found", "error")
+        flash("F!L Problem not found", "error")
     return redirect(url_for('admin_dashboard'))
 
 
@@ -1095,7 +1099,7 @@ def questions_list():
     Displays the list of questions filtered and grouped by the user's level (like a CP sheet).
     """
     if session.get('role') != 'user':
-        flash("❌ Login required", "error")
+        flash("F!L Login required", "error")
         return redirect(url_for('login_page'))
 
     username = session.get('username')
@@ -1131,11 +1135,11 @@ def questions_list():
 
     inner_content = f"""
   <div class="card">
-    <h3>📚 Questions Sheet (Your Max Level: <span class="level-{{session.user_level}}">{{session.user_level}}</span>)</h3>
+    <h3>// PROBLEM ARCHIVE // (User LVL: <span class="level-{{session.user_level}}">{{session.user_level}}</span>)</h3>
     <div class="card contest-{status.lower()}" style="margin-bottom: 20px;">
-        Contest Status: <strong>{status}</strong> | {message}
+        STATUS: <strong>{status}</strong> | {message}
         {'{% if not is_contest_active and status != "OFFLINE" %}'}
-            <p class="small" style="color:#fff;">You are in Training Mode. Submissions will only count during active Contests.</p>
+            <p class="small" style="color:#fff;">[ Mode: Training. Submissions only count during active Contests ]</p>
         {'{% endif %}'}
     </div>
 
@@ -1143,26 +1147,25 @@ def questions_list():
 
     {'{% for level in ordered_levels_to_show %}'}
         {'{% if grouped_questions[level]|length > 0 %}'}
-            <h4 class="level-{{{{ level }}}}">Level {{{{ level }}}} Problems ({{{{ grouped_questions[level]|length }}}} Questions)</h4>
+            <h4 class="level-{{{{ level }}}}">// LEVEL {{{{ level }}}} PROBLEMS ({{{{ grouped_questions[level]|length }}}} ENTRIES) //</h4>
             <table>
-                <tr><th>ID</th><th>Level</th><th>Title</th><th>Time Limit</th><th>Runtime (s)</th><th>Memory</th><th>Status</th><th>Solve</th></tr>
+                <tr><th>ID</th><th>LEVEL</th><th>TITLE</th><th>TIME (MIN)</th><th>RUN (S)</th><th>MEM (MB)</th><th>STATUS</th><th>LINK</th></tr>
                 {'{% for q in grouped_questions[level] %}'}
                 <tr>
                     <td><strong>{{{{ q.id }}}}</strong></td>
                     <td class="level-{{{{ q.get('level', 'A') }}}}"><strong>{{{{ q.get('level', 'A') }}}}</strong></td>
                     <td>{{{{ q.title }}}}</td>
-                    <td>{{{{ q.get('time_limit_minutes', 15) }}}} min</td>
-                    <td class="runtime-{{{{ 'slow' if q.get('runtime_limit_seconds', 2.0) > 3.0 else 'good' }}}}">{{{{ q.get('runtime_limit_seconds', 2.0) }}}} s</td>
-                    <td>{{{{ q.get('memory_limit_mb', 256) }}}} MB</td>
+                    <td>{{{{ q.get('time_limit_minutes', 15) }}}}</td>
+                    <td class="runtime-{{{{ 'slow' if q.get('runtime_limit_seconds', 2.0) > 3.0 else 'good' }}}}">{{{{ q.get('runtime_limit_seconds', 2.0) }}}}</td>
+                    <td>{{{{ q.get('memory_limit_mb', 256) }}}}</td>
                     <td>
-                        {{{{ q.status }}}}
-                        {'{% if q.status == "Accepted" or q.status == "Cheated" %}'}
-                            <span class="badge badge-solved">SOLVED</span>
-                        {'{% endif %}'}
+                        <span class="status-{{{{ q.status.split(' ')[0] }}}}">
+                            {{{{ '✔️ ACCEPTED' if q.status == 'Accepted' else '🚨 CHEATED' if q.status == 'Cheated' else q.status | upper | replace('ANSWER', 'ANS') | replace('NOT', '---') | replace('ATTEMPTED', '---') }}}}
+                        </span>
                     </td>
                     <td>
                         <a href="{{{{ url_for('user_question', qid=q.id) }}}}">
-                            <button>{'View' if not is_contest_active else 'Solve'}</button>
+                            <button class="btn-primary">ACCESS</button>
                         </a>
                     </td>
                 </tr>
@@ -1173,7 +1176,7 @@ def questions_list():
     {'{% endfor %}'}
 
     {'{% else %}'}
-    <p style="color:#a0a0a0; text-align:center;">No questions available for your current level ({{session.user_level}})</p>
+    <p style="color:#a0a0a0; text-align:center;">No problems available for your current level ({{session.user_level}})</p>
     {'{% endif %}'}
   </div>
 """
@@ -1197,21 +1200,21 @@ def user_question(qid):
     and manages the per-question timer and AI cheating detection.
     """
     if session.get('role') != 'user':
-        flash("❌ Login required", "error")
+        flash("F!L Login required", "error")
         return redirect(url_for('login_page'))
 
     qdict = load_questions()
     q = qdict.get(str(qid))
 
     if not q:
-        flash("❌ Question not found", "error")
+        flash("F!L Problem not found", "error")
         return redirect(url_for('questions_list'))
 
     user_level_rank = LEVEL_MAP.get(session.get('user_level', 'A'), 0)
     q_level_rank = LEVEL_MAP.get(q.get('level', 'A'), 0)
 
     if q_level_rank > user_level_rank:
-        flash(f"❌ This is a Level {q.get('level')} problem, which is above your current level.", "error")
+        flash(f"F!L This is a Level {q.get('level')} problem, above your current clearance.", "error")
         return redirect(url_for('questions_list'))
 
     # --- TIMER LOGIC ---
@@ -1233,9 +1236,9 @@ def user_question(qid):
     is_submission_allowed = is_contest_active and not is_time_expired
 
     if is_time_expired:
-        timer_status_message = "❌ Time Expired."
+        timer_status_message = "F!L Time Limit Reached"
     else:
-        timer_status_message = f"Time remaining: <span id='countdown'></span> ({TIME_LIMIT_MINUTES} min limit)"
+        timer_status_message = f"Time Remaining: <span id='countdown'></span> ({TIME_LIMIT_MINUTES} min limit)"
         
     RUNTIME_LIMIT = q.get('runtime_limit_seconds', DEFAULT_RUNTIME_LIMIT_SECONDS)
     # --- END TIMER LOGIC ---
@@ -1267,7 +1270,7 @@ int main() {
 
     if request.method == 'POST':
         if not is_submission_allowed:
-            flash("❌ Submission is currently disabled (Contest is not ACTIVE or your time has expired).", "error")
+            flash("F!L Submission is currently disabled (Contest is not ACTIVE or time expired).", "error")
             return redirect(url_for('user_question', qid=qid))
 
         # --- Submission Logic (Code Execution and Grading via API) ---
@@ -1342,7 +1345,7 @@ int main() {
                     sub_info['best_status'] = 'Cheated' # Set status for admin view
                     
                     overall_result = "Accepted" # Keep AC status for user display
-                    flash("✅ Accepted! All test cases passed!", "success")
+                    flash("✔️ ACCESS GRANTED. All test cases passed.", "success")
                 
                 elif not is_best_ac_or_cheated:
                     # First real AC (or overwriting a cheated status with a real one)
@@ -1353,19 +1356,19 @@ int main() {
                     grant_badge(username, "Problem Solved")
                          
                     overall_result = "Accepted"
-                    flash("✅ Accepted! All test cases passed!", "success")
+                    flash("✔️ ACCESS GRANTED. All test cases passed.", "success")
                 
                 else:
                     # Subsequent AC submissions
                     overall_result = "Accepted"
-                    flash("✅ Accepted! All test cases passed!", "success")
+                    flash("✔️ ACCESS GRANTED. All test cases passed.", "success")
 
 
             # Handle non-AC statuses
             elif current_overall_status != "Accepted":
                 if overall_result is None:
-                    overall_result = f"Submission Failed: {current_overall_status}"
-                    flash(f"❌ Submission Failed: {overall_result}", "error")
+                    overall_result = f"F!L Submission Failed: {current_overall_status}"
+                    flash(f"F!L Submission Failed: {current_overall_status}", "error")
                 
                 # Update best status only if current status is better than Not Attempted/Compile Error
                 if not is_best_ac_or_cheated and sub_info['best_status'] in ['Not Attempted', 'Compile Error']:
@@ -1375,7 +1378,7 @@ int main() {
             
         except Exception as e:
             logger.error(f"Submission processing failed: {e}")
-            flash("❌ An unexpected system error occurred during grading.", "error")
+            flash("F!L An unexpected system error occurred during grading.", "error")
             overall_result = "System Error"
             
         # --- End Submission Logic ---
@@ -1384,61 +1387,66 @@ int main() {
     inner_content = f"""
     <div class="card">
       <header style="display:flex; justify-content:space-between; align-items:center;">
-          <h3>📝 Question {q['id']} (<span class="level-{q.get('level', 'A')}">{q.get('level', 'A')}</span>): {q['title']}</h3>
+          <h3>// PROBLEM {q['id']} ({q.get('level', 'A')}) // {q['title'].upper()}</h3>
           <div class="card contest-{{'active' if is_submission_allowed else 'finished'}}" style="padding: 10px; margin: 0; min-width: 250px; text-align: center;">
               {timer_status_message}
           </div>
       </header>
 
-      <p style="background:#292929; padding:15px; border-radius:6px; border-left:4px solid #38bdf8;">
+      <div class="ai-notice card" style="border-left: 4px solid var(--color-accent);">
+          <strong>[ WARNING: AI INTERVENTION PROTOCOL ACTIVE ]</strong>
+          <p class="small" style="color:var(--color-text); margin-top: 5px;">Your code will be analyzed for external generation patterns. Unauthorized assistance may result in account termination. Proceed with integrity.</p>
+      </div>
+
+      <p style="background:#1a2b4d; padding:15px; border-left:4px solid var(--color-border);">
         {q['description']}
       </p>
 
       <div class="grid-4" style="font-size:14px; color:#a0a0a0; margin-bottom: 20px;">
-          <div><strong>Coding Time:</strong> {q.get('time_limit_minutes', 15)} min</div>
+          <div><strong style="color:var(--color-accent);">CODING TIME:</strong> {q.get('time_limit_minutes', 15)} MIN</div>
           <div class="runtime-{{'slow' if RUNTIME_LIMIT > 3.0 else 'good'}}">
-              <strong>Runtime Limit:</strong> {RUNTIME_LIMIT} seconds
+              <strong style="color:var(--color-accent);">RUN LIMIT:</strong> {RUNTIME_LIMIT} S
           </div>
-          <div><strong>Memory Limit:</strong> {q.get('memory_limit_mb', 256)} MB</div>
-          <div><a href="{{{{ url_for('questions_list') }}}}">← Back to Sheet</a></div>
+          <div><strong style="color:var(--color-accent);">MEM LIMIT:</strong> {q.get('memory_limit_mb', 256)} MB</div>
+          <div><a href="{{{{ url_for('questions_list') }}}}">← BACK TO ARCHIVE</a></div>
       </div>
       
-      <h4>💻 Write your code:</h4>
+      <h4>// INPUT CODE //</h4>
       <form method="POST" action="{{{{ url_for('user_question', qid=q.id) }}}}">
         <textarea id="code" name="code">{{{{ code_to_display }}}}</textarea> 
         <br><br>
         <button type="submit" {'disabled' if not is_submission_allowed else ''}>
-            {{{{ '▶️ Submit Code' if is_submission_allowed else '🔒 Submissions Locked' }}}}
+            {{{{ '► SUBMIT CODE' if is_submission_allowed else '► ACCESS DENIED' }}}}
         </button>
       </form>
 
       {'{% if not is_submission_allowed and status != "OFFLINE" %}'}
-          <p class="small flash-error" style="margin-top:15px; text-align:center;">Submissions are only allowed when the contest status is **ACTIVE** AND your time has not expired.</p>
+          <p class="small flash-error" style="margin-top:15px; text-align:center;">SUBMISSION LOCKOUT: Contest is not ACTIVE OR Time Expired.</p>
       {'{% endif %}'}
 
       {'{% if compile_error %}'}
-        <h4>❌ Compilation Error:</h4>
-        <pre style="color:#ef4444;">{{{{ compile_error }}}}</pre> 
+        <h4 style="color: #ff4444;">F!L COMPILATION FAILURE</h4>
+        <pre style="border-color:#ff4444; color: #ff8888;">{{{{ compile_error }}}}</pre> 
       {'{% endif %}'}
 
       {'{% if overall_result %}'}
-        <h4>Final Result:</h4>
+        <h4>// JUDGEMENT REPORT //</h4>
         {'{% if overall_result == "Accepted" %}'}
-          <p class="accepted">✅ {{{{ overall_result }}}} (Passed {{{{ q.get('test_cases', [])|length }}}} / {{{{ q.get('test_cases', [])|length }}}} Cases)</p>
+          <p class="accepted result-icon-AC"><span class="result-icon">✔️</span> {{{{ overall_result | upper }}}} (CASES PASSED: {{{{ q.get('test_cases', [])|length }}}} / {{{{ q.get('test_cases', [])|length }}}} )</p>
         {'{% else %}'}
-          <p class="wrong">❌ {{{{ overall_result }}}}</p>
+          <p class="wrong result-icon-FAIL"><span class="result-icon">F!L</span> {{{{ overall_result | upper }}}}</p>
 
           {'{% set first_failure = False %}'}
           {'{% for tc in test_case_results %}'}
               {'{% if tc.status != "Accepted" and not first_failure %}'}
                   {'{% set first_failure = True %}'}
-                  <h4>❌ First Failed Test Case: {{{{ tc.status }}}}</h4>
+                  <h4 style="color: #ff4444;">F!L FAILED TEST CASE: {{{{ tc.status | upper }}}}</h4>
                   <div class="grid-3">
-                      <div><label>Input:</label><pre>{{{{ tc.input }}}}</pre></div>
-                      <div><label>Your Output:</label><pre style="color:#ef4444;">{{{{ tc.output }}}}</pre></div>
-                      <div><label>Expected Output:</label><pre>{{{{ tc.expected }}}}</pre></div>
+                      <div><label style="color: var(--color-accent);">INPUT VECTOR:</label><pre>{{{{ tc.input }}}}</pre></div>
+                      <div><label style="color: #ff4444;">YOUR OUTPUT:</label><pre style="border-color:#ff4444; color: #ff8888;">{{{{ tc.output }}}}</pre></div>
+                      <div><label style="color: var(--color-main);">EXPECTED OUTPUT:</label><pre>{{{{ tc.expected }}}}</pre></div>
                   </div>
-                  <p class="small" style="color:#fcd34d;">The test runner stops after the first incorrect result.</p>
+                  <p class="small" style="color:#fcd34d;">TERMINATING EXECUTION: JUDGE HALTED ON FIRST FAILURE.</p>
               {'{% endif %}'}
           {'{% endfor %}'}
         {'{% endif %}'}
@@ -1478,10 +1486,10 @@ int main() {
       function updateTimer() {{
           if (timeRemaining <= 0) {{
               timeRemaining = 0;
-              countdownElement.innerHTML = 'Time Expired';
+              countdownElement.innerHTML = 'TIME OUT';
               if (submitButton) {{
                   submitButton.disabled = true;
-                  submitButton.innerHTML = '🔒 Time Expired';
+                  submitButton.innerHTML = '► ACCESS DENIED';
               }}
               clearInterval(timerInterval);
               return;
