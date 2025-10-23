@@ -67,15 +67,19 @@ def run_code_via_api(code, input_data, runtime_limit):
         if "while(true)" in code or "time.sleep(5)" in code:
             return "Time Limit Exceeded", "Execution took too long.", runtime_limit
         
-        # Simulation for the logarithmic comparison problem (2^3 vs 3^2)
+        # Test Case 1: Logarithmic Comparison (Input: 2 3 3 2, Expected: NO)
+        # We check for 'log' in the code to ensure the user used the correct method
         if "log" in code and input_data.strip() == "2 3 3 2":
-             # 2^3 vs 3^2 is 8 vs 9 (NO)
              return "Accepted", "NO", random.uniform(0.1, 0.5) 
+
+        # Test Case 2: Logarithmic Comparison (Another case, e.g., 3 3 2 4 -> 27 vs 16, so YES)
+        if "log" in code and input_data.strip() == "3 3 2 4":
+             return "Accepted", "YES", random.uniform(0.1, 0.5) 
              
-        # Simulation for Accepted (e.g., A1: A+B)
+        # Test Case 3: Simple Addition (e.g., A1: A+B)
         if "A + B" in code and input_data.strip() == "1 2":
             return "Accepted", "3", random.uniform(0.1, 0.5)
-
+        
         # Default simulation for Wrong Answer
         return "Wrong Answer", "Simulated incorrect output", random.uniform(0.1, 1.0)
 
@@ -83,6 +87,26 @@ def run_code_via_api(code, input_data, runtime_limit):
         logger.error(f"Simulated API Error: {e}")
         return "System Error", f"Failed due to internal judge issue: {e}", 0.0
     # --- END API SIMULATION BLOCK ---
+
+
+# RE-ADDED: Simulated AI Detection Function
+def check_for_simulated_ai_usage(code):
+    """
+    SIMULATED AI DETECTION: Placeholder logic.
+    If true, the admin sees 'Cheated', but the user sees 'Accepted'.
+    """
+    code_lines = len(code.split('\n'))
+    
+    # Flag for very long code (e.g., a simple problem but the user submits 200 lines)
+    if code_lines > 100:
+        if random.random() < 0.8: 
+            return True, f"Code length is excessive ({code_lines} lines)."
+            
+    # Randomly flag simple code (5% chance)
+    if code_lines < 30 and random.random() < 0.05: 
+        return True, "Suspicious coding pattern detected."
+
+    return False, "No immediate AI flag."
 
 
 def get_wan_ip():
@@ -505,7 +529,7 @@ def admin_dashboard():
             user_submission_data[uname] = {
                 'level': udata.get('level', 'A'),
                 'total_solved': sum(1 for qid, sub_info in udata.get('submissions', {}).items() if
-                                    sub_info.get('best_status') == 'Accepted'), 
+                                    sub_info.get('best_status') in ['Accepted', 'Cheated']), # Include Cheated in solved count
                 'submissions': udata.get('submissions', {})
             }
 
@@ -626,6 +650,8 @@ Hello###Hello</textarea>
           {''.join(f"""
             <td class="status-{udata['submissions'].get(str(q['id']), {}).get('best_status', 'Not Attempted').split(' ')[0] if udata['submissions'].get(str(q['id']), {}).get('best_status') != 'Not Attempted' else 'NA'}">
               {udata['submissions'].get(str(q['id']), {}).get('best_status', 'Not Attempted').split(' ')[0] if udata['submissions'].get(str(q['id']), {}).get('best_status') != 'Not Attempted' else '-'}
+              
+              {f'<span title="{udata["submissions"].get(str(q["id"]), {}).get("ai_reason", "AI Flagged")}" class="ai-flag-admin">🚨 CHEATED</span>' if udata['submissions'].get(str(q['id']), {}).get('best_status') == 'Cheated' else ''}
             </td>
           """ for q in qs)}
           <td>
@@ -1130,7 +1156,7 @@ def questions_list():
                     <td>{{{{ q.get('memory_limit_mb', 256) }}}} MB</td>
                     <td>
                         {{{{ q.status }}}}
-                        {'{% if q.status == "Accepted" %}'}
+                        {'{% if q.status == "Accepted" or q.status == "Cheated" %}'}
                             <span class="badge badge-solved">SOLVED</span>
                         {'{% endif %}'}
                     </td>
@@ -1168,7 +1194,7 @@ def questions_list():
 def user_question(qid):
     """
     Displays a single question, handles code submission via API,
-    and manages the per-question timer.
+    and manages the per-question timer and AI cheating detection.
     """
     if session.get('role') != 'user':
         flash("❌ Login required", "error")
@@ -1297,21 +1323,42 @@ int main() {
             # Ensure submission record exists
             if 'submissions' not in user_data: user_data['submissions'] = {}
             if qid_str not in user_data['submissions']: user_data['submissions'][qid_str] = {
-                'best_status': 'Not Attempted', 'attempts': 0}
+                'best_status': 'Not Attempted', 'attempts': 0, 'ai_flagged': False, 'ai_reason': ''}
             
             sub_info = user_data['submissions'][qid_str]
             sub_info['attempts'] += 1
 
-            is_best_ac = sub_info['best_status'] == 'Accepted'
+            is_best_ac_or_cheated = sub_info['best_status'] in ['Accepted', 'Cheated'] 
             
             if current_overall_status == "Accepted":
                 
-                if not is_best_ac:
+                # --- AI CHEATING DETECTION ---
+                ai_flagged, ai_reason = check_for_simulated_ai_usage(code)
+
+                if ai_flagged:
+                    # Log the cheat but tell the user it was AC
+                    sub_info['ai_flagged'] = True
+                    sub_info['ai_reason'] = ai_reason
+                    sub_info['best_status'] = 'Cheated' # Set status for admin view
+                    
+                    overall_result = "Accepted" # Keep AC status for user display
+                    flash("✅ Accepted! All test cases passed!", "success")
+                
+                elif not is_best_ac_or_cheated:
+                    # First real AC (or overwriting a cheated status with a real one)
+                    sub_info['ai_flagged'] = False
+                    sub_info['ai_reason'] = ""
                     sub_info['best_status'] = 'Accepted'
+                    
                     grant_badge(username, "Problem Solved")
-                        
-                overall_result = "Accepted"
-                flash("✅ Accepted! All test cases passed!", "success")
+                         
+                    overall_result = "Accepted"
+                    flash("✅ Accepted! All test cases passed!", "success")
+                
+                else:
+                    # Subsequent AC submissions
+                    overall_result = "Accepted"
+                    flash("✅ Accepted! All test cases passed!", "success")
 
 
             # Handle non-AC statuses
@@ -1321,7 +1368,7 @@ int main() {
                     flash(f"❌ Submission Failed: {overall_result}", "error")
                 
                 # Update best status only if current status is better than Not Attempted/Compile Error
-                if not is_best_ac and sub_info['best_status'] in ['Not Attempted', 'Compile Error']:
+                if not is_best_ac_or_cheated and sub_info['best_status'] in ['Not Attempted', 'Compile Error']:
                     sub_info['best_status'] = current_overall_status
                 
             save_users(users)
