@@ -1659,6 +1659,5 @@ int main() {
 
 
 if __name__ == '__main__':
-    # WARNING: DO NOT USE FOR PUBLIC INTERNET HOSTING WITHOUT A SANDBOX/DOCKER.
     port = int(os.environ.get("PORT", 5000))
     app.run(host='0.0.0.0', port=port, debug=False)
