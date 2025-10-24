@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 import logging
 import socket
 import requests 
+import re
+from collections import Counter
 
 # Load environment variables FIRST to get SECRET_KEY/ADMIN_PASS
 load_dotenv()
@@ -33,9 +35,6 @@ DEFAULT_RUNTIME_LIMIT_SECONDS = 2.0  # Default execution time limit
 ADMIN_USER = os.getenv('ADMIN_USERNAME', 'elorex909')
 ADMIN_PASS_HASH = generate_password_hash(os.getenv('ADMIN_PASSWORD', 'A7s6d5147852369@#'))
 
-# Placeholder for your actual Online Compiler API URL (Used in simulation only)
-API_ENDPOINT = "https://your-online-compiler-api.com/run" 
-
 # ----- Files configuration -----
 USERS_FILE = "users.json"
 QUESTIONS_FILE = "questions.json"
@@ -44,59 +43,184 @@ CONTEST_CONFIG_FILE = "contest_config.json"
 
 # ------------------ Helpers ------------------
 
+def enhanced_ai_detection(code, problem_description=""):
+    """
+    Enhanced AI detection with multiple heuristics
+    """
+    flags = []
+    reasons = []
+    
+    # 1. Code style analysis
+    lines = code.split('\n')
+    code_lines = [line for line in lines if line.strip() and not line.strip().startswith('//')]
+    
+    # Check for excessive comments or generic variable names
+    comment_ratio = len([l for l in lines if '//' in l]) / max(len(lines), 1)
+    if comment_ratio > 0.3:
+        flags.append("HIGH_COMMENT_RATIO")
+        reasons.append("Unnaturally high comment-to-code ratio")
+    
+    # 2. Variable naming patterns
+    generic_vars = re.findall(r'\b(temp|var|value|data|result|input|output)\b', code, re.IGNORECASE)
+    if len(generic_vars) > 5:
+        flags.append("GENERIC_NAMING")
+        reasons.append("Excessive use of generic variable names")
+    
+    # 3. Complexity analysis
+    if len(code_lines) < 15 and "complexity" in problem_description.lower():
+        flags.append("OVERSIMPLIFIED")
+        reasons.append("Solution appears oversimplified for problem complexity")
+    
+    # 4. Common AI patterns
+    ai_patterns = [
+        r'#include\s*<bits/stdc\+\+\.h>',
+        r'using\s+namespace\s+std\s*;',
+        r'int\s+main\s*\(\s*\)'
+    ]
+    
+    ai_score = 0
+    for pattern in ai_patterns:
+        if re.search(pattern, code):
+            ai_score += 1
+    
+    if ai_score >= 2:
+        flags.append("AI_STYLE")
+        reasons.append("Code structure matches common AI-generated patterns")
+    
+    # 5. Code length analysis
+    if len(code_lines) > 100:
+        flags.append("LONG_CODE")
+        reasons.append(f"Code length is excessive ({len(code_lines)} lines)")
+    elif len(code_lines) < 10:
+        flags.append("SHORT_CODE")
+        reasons.append(f"Code appears too short ({len(code_lines)} lines) for competitive programming")
+    
+    # Decision logic
+    if len(flags) >= 2:
+        return True, f"Multiple flags detected: {', '.join(flags)}. Reasons: {'; '.join(reasons)}"
+    elif "AI_STYLE" in flags and len(code_lines) > 50:
+        return True, "Strong AI pattern match"
+    elif "LONG_CODE" in flags and comment_ratio > 0.2:
+        return True, "Suspicious combination of long code and high comments"
+    
+    return False, "No significant AI patterns detected"
+
+
+def run_code_via_piston(code, input_data, runtime_limit):
+    """
+    Run C++ code using Piston API (open source)
+    """
+    try:
+        payload = {
+            "language": "cpp",
+            "version": "10.2.0",
+            "files": [{"content": code}],
+            "stdin": input_data,
+            "compile_timeout": 10000,
+            "run_timeout": int(runtime_limit * 1000)
+        }
+        
+        response = requests.post(
+            'https://emkc.org/api/v2/piston/execute',
+            json=payload,
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            run_result = result.get('run', {})
+            
+            # Check for compilation errors
+            compile_output = result.get('compile', {}).get('output', '').strip()
+            if compile_output and 'error' in compile_output.lower():
+                return "Compile Error", compile_output, 0.0
+            
+            if run_result.get('signal') == 'SIGKILL':
+                return "Time Limit Exceeded", "Process killed due to timeout", runtime_limit
+            
+            output = run_result.get('output', '').strip()
+            exit_code = run_result.get('code', 0)
+            
+            if exit_code == 0:
+                return "Accepted", output, float(run_result.get('time', 0.0))
+            else:
+                return "Runtime Error", f"Exit code {exit_code}: {output}", float(run_result.get('time', 0.0))
+                
+        else:
+            return "System Error", f"Piston API error: {response.status_code}", 0.0
+            
+    except requests.exceptions.Timeout:
+        return "Time Limit Exceeded", "Execution timeout", runtime_limit
+    except Exception as e:
+        logger.error(f"Piston API Error: {e}")
+        return "System Error", f"Compiler service unavailable: {e}", 0.0
+
+
+def run_code_via_jdoodle(code, input_data, runtime_limit):
+    """
+    Run C++ code using JDoodle Compiler API
+    """
+    try:
+        # JDoodle API credentials (you need to sign up for free)
+        client_id = os.getenv('JDOODLE_CLIENT_ID', '')
+        client_secret = os.getenv('JDOODLE_CLIENT_SECRET', '')
+        
+        # If no JDoodle credentials, fall back to Piston
+        if not client_id or not client_secret:
+            return run_code_via_piston(code, input_data, runtime_limit)
+        
+        payload = {
+            "script": code,
+            "stdin": input_data,
+            "language": "cpp",
+            "versionIndex": "0",
+            "compileOnly": False
+        }
+        
+        headers = {
+            'Content-Type': 'application/json',
+            'X-Requested-With': 'XMLHttpRequest'
+        }
+        
+        response = requests.post(
+            'https://api.jdoodle.com/v1/execute',
+            json=payload,
+            headers=headers,
+            auth=(client_id, client_secret),
+            timeout=30
+        )
+        
+        if response.status_code == 200:
+            result = response.json()
+            
+            if 'error' in result:
+                return "Compile Error", result['error'], 0.0
+            
+            output = result.get('output', '').strip()
+            status = result.get('statusCode', 200)
+            
+            if status == 200:
+                return "Accepted", output, float(result.get('cpuTime', 0.0))
+            else:
+                return "Runtime Error", output, 0.0
+                
+        else:
+            return "System Error", f"API returned {response.status_code}", 0.0
+            
+    except requests.exceptions.Timeout:
+        return "Time Limit Exceeded", "Execution timeout", runtime_limit
+    except Exception as e:
+        logger.error(f"JDoodle API Error: {e}")
+        return "System Error", f"Compiler service unavailable: {e}", 0.0
+
+
 # NEW HELPER: Runs code using an external API
 def run_code_via_api(code, input_data, runtime_limit):
     """
-    Simulates running C++ code against an external API (Online Judge).
-    
-    Returns: 
-        tuple: (status: str, output: str, runtime: float)
+    Runs C++ code against real online compiler APIs
     """
-    
-    # --- START API SIMULATION BLOCK (REPLACE THIS WITH REAL REQUESTS) ---
-    try:
-        time.sleep(0.05) 
-        
-        # Simulation for Compile Error
-        if "main()" not in code:
-            return "Compile Error", "Missing main function", 0.0
-
-        # Simulation for Time Limit Exceeded
-        if "while(true)" in code or "time.sleep(5)" in code:
-            return "Time Limit Exceeded", "Execution took too long.", runtime_limit
-        
-        # 1. Question 2 (A): Simple "Hello" output. Checks for cout << "Hello"
-        if "cout<<\"Hello\"" in code.replace(' ', '') and input_data.strip() == "":
-             return "Accepted", "Hello", random.uniform(0.1, 0.5) 
-
-        # 2. Logarithmic Comparison (for testing Question 1: 2 3 3 2)
-        if "log" in code and input_data.strip() == "2 3 3 2":
-             return "Accepted", "NO", random.uniform(0.1, 0.5) 
-             
-        # 3. Simple Addition (e.g., A1: A+B, Input: 1 2)
-        if "A + B" in code and input_data.strip() == "1 2":
-            return "Accepted", "3", random.uniform(0.1, 0.5)
-        
-        # Default simulation for Wrong Answer
-        return "Wrong Answer", "Simulated incorrect output", random.uniform(0.1, 1.0)
-
-    except Exception as e:
-        logger.error(f"Simulated API Error: {e}")
-        return "System Error", f"Failed due to internal judge issue: {e}", 0.0
-    # --- END API SIMULATION BLOCK ---
-
-
-# Simulated AI Detection Function (Re-added)
-def check_for_simulated_ai_usage(code):
-    """
-    SIMULATED AI DETECTION: Placeholder logic.
-    """
-    code_lines = len(code.split('\n'))
-    if code_lines > 100 and random.random() < 0.8: 
-        return True, f"Code length is excessive ({code_lines} lines)."
-    if code_lines < 30 and random.random() < 0.05: 
-        return True, "Suspicious coding pattern detected."
-    return False, "No immediate AI flag."
+    # Try Piston API first (free, no registration required)
+    return run_code_via_piston(code, input_data, runtime_limit)
 
 
 def get_wan_ip():
@@ -420,6 +544,15 @@ def render_base(content, **kwargs):
     
     /* AI Notice (Retained but simplified) */
     .ai-notice { background: #1a0033; color: var(--color-accent); border-color: var(--color-accent); text-shadow: none; }
+    
+    /* Grid layouts */
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 15px; }
+    .grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 15px; }
+    
+    @media (max-width: 768px) {
+        .grid-2, .grid-3, .grid-4 { grid-template-columns: 1fr; }
+    }
     
   </style>
 </head>
@@ -1335,8 +1468,8 @@ int main() {
             
             if current_overall_status == "Accepted":
                 
-                # --- AI CHEATING DETECTION ---
-                ai_flagged, ai_reason = check_for_simulated_ai_usage(code)
+                # --- ENHANCED AI CHEATING DETECTION ---
+                ai_flagged, ai_reason = enhanced_ai_detection(code, q.get('description', ''))
 
                 if ai_flagged:
                     # Log the cheat but tell the user it was AC
@@ -1346,6 +1479,7 @@ int main() {
                     
                     overall_result = "Accepted" # Keep AC status for user display
                     flash("✔️ ACCESS GRANTED. All test cases passed.", "success")
+                    logger.info(f"AI cheating detected for user {username} on problem {qid}: {ai_reason}")
                 
                 elif not is_best_ac_or_cheated:
                     # First real AC (or overwriting a cheated status with a real one)
@@ -1526,4 +1660,5 @@ int main() {
 
 if __name__ == '__main__':
     # WARNING: DO NOT USE FOR PUBLIC INTERNET HOSTING WITHOUT A SANDBOX/DOCKER.
-    app.run(host='0.0.0.0', debug=True)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host='0.0.0.0', port=port, debug=False)
