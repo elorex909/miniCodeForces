@@ -1656,7 +1656,26 @@ int main() {
         time_remaining_seconds=time_remaining_seconds
     )
     return render_base(rendered_content)
+@app.route('/health')
+def health_check():
+    return {'status': 'healthy', 'message': 'Mini Codeforces is running'}, 200
 
+@app.route('/')
+def index():
+    """Redirects authenticated users to the appropriate dashboard."""
+    if session.get('role') == 'user':
+        return redirect(url_for('questions_list'))
+    if session.get('role') == 'admin':
+        return redirect(url_for('admin_dashboard'))
+    return redirect(url_for('login_page'))
+
+if __name__ == '__main__':
+    port = int(os.environ.get("PORT", 5000))
+    print(f"🚀 Starting Mini Codeforces on port {port}")
+    
+    # استخدام Waitress للسيرفر production
+    from waitress import serve
+    serve(app, host='0.0.0.0', port=port)
 
 if __name__ == '__main__':
     port = int(os.environ.get("PORT", 5000))
